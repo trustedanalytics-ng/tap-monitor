@@ -1,0 +1,11 @@
+.idea
+/application/
+.cache
+/pkg
+/bin
+build_info.ini
+*mock.go
+*mock_test.go
+*.iml
+temp
+tapng-monitor
