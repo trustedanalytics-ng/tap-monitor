@@ -16,9 +16,28 @@
 
 package main
 
-import "fmt"
+import (
+	"github.com/trustedanalytics/tapng-monitor/app"
+	"github.com/trustedanalytics/tapng-go-common/logger"
+)
+
+var logger = logger_wrapper.InitLogger("main")
+
 
 func main() {
 
-	fmt.Println("hello world!")
+	err := app.InitConnections()
+	if err != nil {
+		logger.Fatal("ERROR initConnections: ", err.Error())
+	}
+
+	err = app.InitQueue()
+	if err != nil {
+		logger.Fatal("ERROR initQueue: ", err.Error())
+	}
+
+	err = app.StartMonitor()
+	if err != nil {
+		logger.Fatal("ERROR StartMonitor: ", err.Error())
+	}
 }
