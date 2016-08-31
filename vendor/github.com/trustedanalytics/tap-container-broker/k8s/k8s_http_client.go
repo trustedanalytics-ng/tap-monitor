@@ -28,8 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 
-	brokerHttp "github.com/trustedanalytics/tapng-go-common/http"
-	"github.com/trustedanalytics/tapng-go-common/logger"
+	brokerHttp "github.com/trustedanalytics/tap-go-common/http"
+	"github.com/trustedanalytics/tap-go-common/logger"
 )
 
 // we need this redundant interface to be able to inject TestClient in Test class

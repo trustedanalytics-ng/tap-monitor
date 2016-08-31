@@ -202,70 +202,70 @@
 		},
 		{
 			"checksumSHA1": "0JSOhUE8XstR+LPtITLWbNMM61A=",
-			"path": "github.com/trustedanalytics/tapng-catalog/client",
+			"path": "github.com/trustedanalytics/tap-catalog/client",
 			"revision": "4009435b565496168a052f81de23b3ac4fff7666",
 			"revisionTime": "2016-08-18T10:49:53Z"
 		},
 		{
 			"checksumSHA1": "05UT2j6zwYv1aNbMQ0yunk58+QA=",
-			"path": "github.com/trustedanalytics/tapng-catalog/models",
+			"path": "github.com/trustedanalytics/tap-catalog/models",
 			"revision": "4009435b565496168a052f81de23b3ac4fff7666",
 			"revisionTime": "2016-08-18T10:49:53Z"
 		},
 		{
 			"checksumSHA1": "H/tU/f9a07X07VcwXtTmpmBdlaQ=",
-			"path": "github.com/trustedanalytics/tapng-container-broker/k8s",
+			"path": "github.com/trustedanalytics/tap-container-broker/k8s",
 			"revision": "d65832eada4c3ab3d2e4854b396889cf20fd3a39",
 			"revisionTime": "2016-08-17T09:29:29Z"
 		},
 		{
 			"checksumSHA1": "7Cq5XD5BiUEjCiXtaos2nINDZfY=",
-			"path": "github.com/trustedanalytics/tapng-container-broker/models",
+			"path": "github.com/trustedanalytics/tap-container-broker/models",
 			"revision": "0fa0a72b9eedba9aa98fc82dae1a2bf9fc06f9de",
 			"revisionTime": "2016-08-24T16:11:21Z"
 		},
 		{
 			"checksumSHA1": "6+f2gaE260jteMQYUVDDBP6B8MU=",
-			"path": "github.com/trustedanalytics/tapng-go-common/http",
+			"path": "github.com/trustedanalytics/tap-go-common/http",
 			"revision": "85983ffa43f22718c1d3dd1b468d36e3d9afc955",
 			"revisionTime": "2016-08-18T10:42:39Z"
 		},
 		{
 			"checksumSHA1": "RVbaAnp5aHoeOAwEiyyd7EHax+w=",
-			"path": "github.com/trustedanalytics/tapng-go-common/logger",
+			"path": "github.com/trustedanalytics/tap-go-common/logger",
 			"revision": "ca34c9d2950032f078db7054a2206e7989a86ab3",
 			"revisionTime": "2016-08-08T10:11:52Z"
 		},
 		{
 			"checksumSHA1": "HYH5ueQ2rfUL0Km1uXHdYM+4sC8=",
-			"path": "github.com/trustedanalytics/tapng-template-repository/model",
+			"path": "github.com/trustedanalytics/tap-template-repository/model",
 			"revision": "2c42df365083d200148f54652eb2792d90bb873f",
 			"revisionTime": "2016-08-16T11:47:16Z"
 		},
 		{
 			"checksumSHA1": "tHm2SMtuRfrwh6NnnymsuoJ6e0Q=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/github.com/ugorji/go/codec",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/github.com/ugorji/go/codec",
 			"path": "github.com/ugorji/go/codec",
 			"revision": "a396ed22fc049df733440d90efe17475e3929ccb",
 			"revisionTime": "2016-03-28T06:07:40Z"
 		},
 		{
 			"checksumSHA1": "9jjO5GjLa0XF/nfWihF02RoH4qc=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/golang.org/x/net/context",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/golang.org/x/net/context",
 			"path": "golang.org/x/net/context",
 			"revision": "8bf2b39827dbadfd566c4fae7a8790d12be8b23c",
 			"revisionTime": "2016-06-18T00:37:29Z"
 		},
 		{
 			"checksumSHA1": "CoRxz7vk573Zu/UcMS4PzpAsv3w=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/golang.org/x/sys/unix",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/golang.org/x/sys/unix",
 			"path": "golang.org/x/sys/unix",
 			"revision": "b776ec39b3e54652e09028aaaaac9757f4f8211a",
 			"revisionTime": "2016-04-21T02:29:30Z"
 		},
 		{
 			"checksumSHA1": "fvxJc6HtGKQ0ElY1/gfRca5dCcY=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/api",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/api",
 			"path": "k8s.io/kubernetes/pkg/api",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
@@ -290,7 +290,7 @@
 		},
 		{
 			"checksumSHA1": "/mpHVAUofNNa5dLGp5tk9oSFFh4=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/api/meta",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/api/meta",
 			"path": "k8s.io/kubernetes/pkg/api/meta",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
@@ -303,7 +303,7 @@
 		},
 		{
 			"checksumSHA1": "dd3A71zfLmq5Nq+tBMzrRGWvK9s=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/api/resource",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/api/resource",
 			"path": "k8s.io/kubernetes/pkg/api/resource",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
@@ -316,7 +316,7 @@
 		},
 		{
 			"checksumSHA1": "b159MFMmqthfmiCQ5OODcCMJmfA=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/api/unversioned",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/api/unversioned",
 			"path": "k8s.io/kubernetes/pkg/api/unversioned",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
@@ -425,7 +425,7 @@
 		},
 		{
 			"checksumSHA1": "hWp4fQf56OFItp3glEAcpck+ntA=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/apis/extensions",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/apis/extensions",
 			"path": "k8s.io/kubernetes/pkg/apis/extensions",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
@@ -462,7 +462,7 @@
 		},
 		{
 			"checksumSHA1": "ErngtVbytZhyuggtakfxqgrS7WA=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/auth/user",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/auth/user",
 			"path": "k8s.io/kubernetes/pkg/auth/user",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
@@ -511,21 +511,21 @@
 		},
 		{
 			"checksumSHA1": "yr2LdDFXUxijRn2X+GbBSp8onTo=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/conversion",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/conversion",
 			"path": "k8s.io/kubernetes/pkg/conversion",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
 		},
 		{
 			"checksumSHA1": "cj9aqD5xBifXiW0YwRFN836Z4Pc=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/conversion/queryparams",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/conversion/queryparams",
 			"path": "k8s.io/kubernetes/pkg/conversion/queryparams",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
 		},
 		{
 			"checksumSHA1": "ZS2khgfmeJhaNulzR31MJZC0e30=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/fields",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/fields",
 			"path": "k8s.io/kubernetes/pkg/fields",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
@@ -538,7 +538,7 @@
 		},
 		{
 			"checksumSHA1": "8xnVVxYBA7urH6bn5irfB+iuZUs=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/labels",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/labels",
 			"path": "k8s.io/kubernetes/pkg/labels",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
@@ -551,63 +551,63 @@
 		},
 		{
 			"checksumSHA1": "yhbDEEJmcpEo45BV36VYmBtR+mY=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/runtime",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/runtime",
 			"path": "k8s.io/kubernetes/pkg/runtime",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
 		},
 		{
 			"checksumSHA1": "H1WyfsymBo+0pDkfqJ+ncKT0oe8=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/runtime/serializer",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/runtime/serializer",
 			"path": "k8s.io/kubernetes/pkg/runtime/serializer",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
 		},
 		{
 			"checksumSHA1": "uIEH5hIkMM1vKruyTzXt5sXT9tU=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/runtime/serializer/json",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/runtime/serializer/json",
 			"path": "k8s.io/kubernetes/pkg/runtime/serializer/json",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
 		},
 		{
 			"checksumSHA1": "mpHkXa4jAsPf03PjheCZ2/Z+d08=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/runtime/serializer/protobuf",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/runtime/serializer/protobuf",
 			"path": "k8s.io/kubernetes/pkg/runtime/serializer/protobuf",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
 		},
 		{
 			"checksumSHA1": "jcuXBnOqhfW1L9Yj+NbowwGga14=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/runtime/serializer/recognizer",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/runtime/serializer/recognizer",
 			"path": "k8s.io/kubernetes/pkg/runtime/serializer/recognizer",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
 		},
 		{
 			"checksumSHA1": "MF8efDl1sDCz6onx9h1pG6Rjoao=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/runtime/serializer/streaming",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/runtime/serializer/streaming",
 			"path": "k8s.io/kubernetes/pkg/runtime/serializer/streaming",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
 		},
 		{
 			"checksumSHA1": "M78gwS9UmJ+aJeS44spq5o8tD1c=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/runtime/serializer/versioning",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/runtime/serializer/versioning",
 			"path": "k8s.io/kubernetes/pkg/runtime/serializer/versioning",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
 		},
 		{
 			"checksumSHA1": "oC7yBeTQRqF2rsE6Suf5V0DlOSA=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/types",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/types",
 			"path": "k8s.io/kubernetes/pkg/types",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
 		},
 		{
 			"checksumSHA1": "XLQghD7xzXQ0tL9L8ZaSPTngIQA=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/util",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/util",
 			"path": "k8s.io/kubernetes/pkg/util",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
@@ -620,7 +620,7 @@
 		},
 		{
 			"checksumSHA1": "3t4lrWFwarkIFvCbxVOKJNsFFdE=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/util/errors",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/util/errors",
 			"path": "k8s.io/kubernetes/pkg/util/errors",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
@@ -639,14 +639,14 @@
 		},
 		{
 			"checksumSHA1": "os5Umb0GpSI+xI3rqo8ng1BlmQM=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/util/integer",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/util/integer",
 			"path": "k8s.io/kubernetes/pkg/util/integer",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
 		},
 		{
 			"checksumSHA1": "CfBuHjWi3fuXuQHjXIpt68hUY8U=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/util/intstr",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/util/intstr",
 			"path": "k8s.io/kubernetes/pkg/util/intstr",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
@@ -671,28 +671,28 @@
 		},
 		{
 			"checksumSHA1": "j3tv5wFxVu2Fkpqb2wC77HLIOd4=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/util/rand",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/util/rand",
 			"path": "k8s.io/kubernetes/pkg/util/rand",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
 		},
 		{
 			"checksumSHA1": "FfYLTplqJuaNKYOE7ljh9rShXoU=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/util/runtime",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/util/runtime",
 			"path": "k8s.io/kubernetes/pkg/util/runtime",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
 		},
 		{
 			"checksumSHA1": "bcHCpDimP7NfcStIDaunSzsc2l8=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/util/sets",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/util/sets",
 			"path": "k8s.io/kubernetes/pkg/util/sets",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
 		},
 		{
 			"checksumSHA1": "FjcJKaXIprpQrMWHRdWgCxKXUBo=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/util/validation",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/util/validation",
 			"path": "k8s.io/kubernetes/pkg/util/validation",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
@@ -705,14 +705,14 @@
 		},
 		{
 			"checksumSHA1": "WDivBudMQRSqSQk7Tj3S5EvpxZQ=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/util/wait",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/util/wait",
 			"path": "k8s.io/kubernetes/pkg/util/wait",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
 		},
 		{
 			"checksumSHA1": "BQS0rQPJUf7ZXLEC3hMxOJ96kAQ=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/pkg/util/yaml",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/pkg/util/yaml",
 			"path": "k8s.io/kubernetes/pkg/util/yaml",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
@@ -737,18 +737,18 @@
 		},
 		{
 			"checksumSHA1": "GS8RhY0+9O9Fb2EMVamcrqpfMgw=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/k8s.io/kubernetes/third_party/forked/reflect",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/k8s.io/kubernetes/third_party/forked/reflect",
 			"path": "k8s.io/kubernetes/third_party/forked/reflect",
 			"revision": "b8d000853edbfe3d0d9bcd85e8e511a98b6ac6af",
 			"revisionTime": "2016-04-05T05:03:32Z"
 		},
 		{
 			"checksumSHA1": "xuAq8CvoMWlyAz0mm5xfLQE9NVw=",
-			"origin": "github.com/trustedanalytics/tapng-template-repository/vendor/speter.net/go/exp/math/dec/inf",
+			"origin": "github.com/trustedanalytics/tap-template-repository/vendor/speter.net/go/exp/math/dec/inf",
 			"path": "speter.net/go/exp/math/dec/inf",
 			"revision": "42ca6cd68aa922bc3f32f1e056e61b65945d9ad7",
 			"revisionTime": "2014-04-17T13:40:36Z"
 		}
 	],
-	"rootPath": "github.com/trustedanalytics/tapng-monitor"
+	"rootPath": "github.com/trustedanalytics/tap-monitor"
 }

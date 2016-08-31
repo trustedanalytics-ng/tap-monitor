@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 
-	"github.com/trustedanalytics/tapng-template-repository/model"
+	"github.com/trustedanalytics/tap-template-repository/model"
 )
 
 type KubernetesApi interface {

@@ -17,8 +17,8 @@
 package main
 
 import (
-	"github.com/trustedanalytics/tapng-monitor/app"
-	"github.com/trustedanalytics/tapng-go-common/logger"
+	"github.com/trustedanalytics/tap-monitor/app"
+	"github.com/trustedanalytics/tap-go-common/logger"
 )
 
 var logger = logger_wrapper.InitLogger("main")

@@ -17,11 +17,11 @@ FROM tapimages.us.enableiot.com:8080/tap-base-binary:binary-jessie
 MAINTAINER Jakub Wierzbowski <jakub.a.wierzbowski@intel.com>
 
 RUN mkdir -p /opt/app
-ADD application/tapng-monitor /opt/app
+ADD application/tap-monitor /opt/app
 
-RUN chmod +x /opt/app/tapng-monitor
+RUN chmod +x /opt/app/tap-monitor
 
 WORKDIR /opt/app/
 
-ENTRYPOINT ["/opt/app/tapng-monitor"]
+ENTRYPOINT ["/opt/app/tap-monitor"]
 CMD [""]

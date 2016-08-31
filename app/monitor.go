@@ -3,8 +3,8 @@ package app
 import (
 	"time"
 
-	catalogModels "github.com/trustedanalytics/tapng-catalog/models"
-	"github.com/trustedanalytics/tapng-go-common/logger"
+	catalogModels "github.com/trustedanalytics/tap-catalog/models"
+	"github.com/trustedanalytics/tap-go-common/logger"
 )
 
 var logger = logger_wrapper.InitLogger("app")

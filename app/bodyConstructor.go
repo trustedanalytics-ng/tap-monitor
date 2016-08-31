@@ -3,8 +3,8 @@ package app
 import (
 	"encoding/json"
 
-	containerBrokerModels "github.com/trustedanalytics/tapng-container-broker/models"
-	catalogModels "github.com/trustedanalytics/tapng-catalog/models"
+	containerBrokerModels "github.com/trustedanalytics/tap-container-broker/models"
+	catalogModels "github.com/trustedanalytics/tap-catalog/models"
 )
 
 

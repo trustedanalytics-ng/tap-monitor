@@ -4,8 +4,8 @@ import (
 	"os"
 	"strings"
 
-	catalogApi "github.com/trustedanalytics/tapng-catalog/client"
-	"github.com/trustedanalytics/tapng-container-broker/k8s"
+	catalogApi "github.com/trustedanalytics/tap-catalog/client"
+	"github.com/trustedanalytics/tap-container-broker/k8s"
 	"errors"
 	"fmt"
 )

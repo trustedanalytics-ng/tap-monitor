@@ -1,6 +1,6 @@
 GOBIN=$(GOPATH)/bin
 APP_DIR_LIST=$(shell go list ./... | grep -v /vendor/)
-APP_NAME=tapng-monitor
+APP_NAME=tap-monitor
 
 build: verify_gopath
 	CGO_ENABLED=0 go install -tags netgo $(APP_DIR_LIST)
@@ -16,7 +16,7 @@ docker_build: build_anywhere
 	docker build -t $(APP_NAME) .
 
 push_docker: docker_build
-	docker tag tapng-container-broker $(REPOSITORY_URL)/$(APP_NAME):latest
+	docker tag tap-container-broker $(REPOSITORY_URL)/$(APP_NAME):latest
 	docker push $(REPOSITORY_URL)/$(APP_NAME):latest
 
 kubernetes_deploy: docker_build
@@ -36,7 +36,7 @@ deps_fetch_specific: bin/govendor
 	@echo "Fetching specific dependency in newest versions"
 	$(GOBIN)/govendor fetch -v $(DEP_URL)
 
-deps_update_tapng: verify_gopath
+deps_update_tap: verify_gopath
 	$(GOBIN)/govendor update github.com/trustedanalytics/...
 	rm -Rf vendor/github.com/trustedanalytics/$(APP_NAME)
 	@echo "Done"

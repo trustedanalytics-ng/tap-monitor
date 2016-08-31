@@ -8,4 +8,4 @@ build_info.ini
 *mock_test.go
 *.iml
 temp
-tapng-monitor
+tap-monitor
