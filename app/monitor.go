@@ -3,63 +3,98 @@ package app
 import (
 	"time"
 
+	"github.com/streadway/amqp"
+
 	catalogModels "github.com/trustedanalytics/tap-catalog/models"
+	containerBrokerModels "github.com/trustedanalytics/tap-container-broker/models"
 	"github.com/trustedanalytics/tap-go-common/logger"
+	"github.com/trustedanalytics/tap-go-common/queue"
+	"github.com/trustedanalytics/tap-go-common/util"
+	"sync"
 )
 
 var logger = logger_wrapper.InitLogger("app")
 
 const CHECK_INTERVAL_SECONDS = 5
 
-func StartMonitor() error {
+// todo this is temporary -> DPNG-10694
+var createInstanceQueue = []string{}
+var deleteInstanceQueue = []string{}
 
-	instancesOnQueue := []string{}
-	var err error
-	for {
-		instancesOnQueue, err = CheckCatalogRequestedService(instancesOnQueue)
-		if err != nil {
-			return err
+func StartMonitor(waitGroup *sync.WaitGroup) {
+	waitGroup.Add(1)
+	channel, conn := queue.GetConnectionChannel()
+	queue.CreateExchangeWithQueueByRoutingKeys(channel, containerBrokerModels.CONTAINER_BROKER_QUEUE_NAME,
+		[]string{containerBrokerModels.CONTAINER_BROKER_CREATE_ROUTING_KEY, containerBrokerModels.CONTAINER_BROKER_DELETE_ROUTING_KEY})
+
+	isRunning := true
+	go func() {
+		<-util.GetTerminationObserverChannel()
+		isRunning = false
+	}()
+
+	for isRunning {
+		if err := CheckCatalogRequestedService(channel); err != nil {
+			logger.Error("Proccessing Catalog data error:", err)
 		}
 		time.Sleep(CHECK_INTERVAL_SECONDS * time.Second)
 	}
+
+	defer conn.Close()
+	defer channel.Close()
+	logger.Info("Monitoring stopped")
+	waitGroup.Done()
 }
 
-
-func CheckCatalogRequestedService(instancesOnQueue []string) ([]string, error){
-
-	var instancesinStateRequested []string
-
+//todo what we should do in error case: log error and continue or break/fail
+//todo should we change instance state to FAILURE on error case?
+func CheckCatalogRequestedService(channel *amqp.Channel) error {
 	instances, _, err := config.CatalogApi.ListServicesInstances()
 	if err != nil {
-		return instancesinStateRequested, err
+		return err
 	}
 
 	for _, instance := range instances {
-
 		if instance.State == catalogModels.InstanceStateRequested {
-
-			instancesinStateRequested = append(instancesinStateRequested, instance.Id)
-
-			if isInstanceIdInArray(instancesOnQueue, instance.Id) {
-				break;
+			if isInstanceIdInArray(createInstanceQueue, instance.Id) {
+				break
 			}
 
-			queueMessage, err := createServiceInstanceBody(instance)
+			queueMessage, err := prepareCreateInstanceRequest(instance)
 			if err != nil {
-				logger.Error("failed to create task for instance: ", instance.Id, "err: ", err.Error())
-				return instancesinStateRequested, err
+				logger.Error("Failed to prepare Message for instance: ", instance.Id, err)
+				return err
 			}
 
-			err = SendMessageToQueue(queueMessage)
-			if err != nil {
-				return instancesinStateRequested, err
+			if err := queue.SendMessageToQueue(channel, queueMessage, containerBrokerModels.CONTAINER_BROKER_QUEUE_NAME,
+				containerBrokerModels.CONTAINER_BROKER_CREATE_ROUTING_KEY); err != nil {
+				return err
 			}
+			createInstanceQueue = append(createInstanceQueue, instance.Id)
+		} else if instance.State == catalogModels.InstanceStateDestroyReq {
+			if isInstanceIdInArray(deleteInstanceQueue, instance.Id) {
+				break
+			}
+
+			queueMessage, err := prepareDeleteRequest(instance)
+			if err != nil {
+				logger.Error("Failed to prepare Message for instance: ", instance.Id, err)
+				return err
+			}
+
+			if err := queue.SendMessageToQueue(channel, queueMessage, containerBrokerModels.CONTAINER_BROKER_QUEUE_NAME,
+				containerBrokerModels.CONTAINER_BROKER_DELETE_ROUTING_KEY); err != nil {
+				return err
+			}
+			deleteInstanceQueue = append(deleteInstanceQueue, instance.Id)
 		}
 	}
-	return instancesinStateRequested, nil
+	return nil
 }
 
-func isInstanceIdInArray(instanceIds []string, wantedInstanceId string) bool{
+// this method supposed to call directly to ETCD (using long pool) for check if specific instance status will change in e.g. next 10 minutes
+// if this happen then we can stop observing isntnace in othercase we should try X more times
+func isInstanceIdInArray(instanceIds []string, wantedInstanceId string) bool {
 	for _, instanceId := range instanceIds {
 		if instanceId == wantedInstanceId {
 			return true

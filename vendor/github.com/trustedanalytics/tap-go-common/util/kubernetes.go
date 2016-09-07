@@ -14,25 +14,23 @@
  * limitations under the License.
  */
 
-package main
+package util
 
 import (
-	"sync"
-
-	"github.com/trustedanalytics/tap-go-common/logger"
-	"github.com/trustedanalytics/tap-go-common/util"
-	"github.com/trustedanalytics/tap-monitor/app"
+	"os"
+	"strings"
 )
 
-var logger = logger_wrapper.InitLogger("main")
-var waitGroup = &sync.WaitGroup{}
-
-func main() {
-	go util.TerminationObserver(waitGroup, "Monitor")
-
-	if err := app.InitConnections(); err != nil {
-		logger.Fatal("ERROR initConnections: ", err.Error())
+func GetAddressFromKubernetesEnvs(componentName string) string {
+	serviceName := os.Getenv(componentName + "_KUBERNETES_SERVICE_NAME")
+	if serviceName != "" {
+		hostname := os.Getenv(strings.ToUpper(serviceName) + "_SERVICE_HOST")
+		if hostname != "" {
+			port := os.Getenv(strings.ToUpper(serviceName) + "_SERVICE_PORT")
+			return hostname + ":" + port
+		}
 	}
-
-	app.StartMonitor(waitGroup)
+	return "localhost" + ":" + os.Getenv(componentName + "_PORT")
 }
+
+

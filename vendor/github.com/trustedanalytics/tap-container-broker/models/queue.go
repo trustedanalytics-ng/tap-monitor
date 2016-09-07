@@ -14,25 +14,12 @@
  * limitations under the License.
  */
 
-package main
+package models
 
-import (
-	"sync"
-
-	"github.com/trustedanalytics/tap-go-common/logger"
-	"github.com/trustedanalytics/tap-go-common/util"
-	"github.com/trustedanalytics/tap-monitor/app"
+const (
+	CONTAINER_BROKER_QUEUE_NAME         = "tap-container-broker"
+	CONTAINER_BROKER_CREATE_ROUTING_KEY = "create"
+	CONTAINER_BROKER_DELETE_ROUTING_KEY = "delete"
+	CONTAINER_BROKER_BIND_ROUTING_KEY   = "bind"
+	CONTAINER_BROKER_UNBIND_ROUTING_KEY = "unbind"
 )
-
-var logger = logger_wrapper.InitLogger("main")
-var waitGroup = &sync.WaitGroup{}
-
-func main() {
-	go util.TerminationObserver(waitGroup, "Monitor")
-
-	if err := app.InitConnections(); err != nil {
-		logger.Fatal("ERROR initConnections: ", err.Error())
-	}
-
-	app.StartMonitor(waitGroup)
-}

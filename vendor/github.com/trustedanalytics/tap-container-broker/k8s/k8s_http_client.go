@@ -125,7 +125,7 @@ func getKubernetesConfig(creds K8sClusterCredentials) (*restclient.Config, error
 	if sslActive {
 		_, transport, err = brokerHttp.GetHttpClientWithCertAndCa(creds.AdminCert, creds.AdminKey, creds.CaCert)
 	} else {
-		_, transport, err = brokerHttp.GetHttpClientWithBasicAuth()
+		_, transport, err = brokerHttp.GetHttpClient()
 	}
 
 	if err != nil {

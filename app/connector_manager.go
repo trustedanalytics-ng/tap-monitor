@@ -1,25 +1,22 @@
 package app
 
 import (
+	"errors"
 	"os"
-	"strings"
 
 	catalogApi "github.com/trustedanalytics/tap-catalog/client"
 	"github.com/trustedanalytics/tap-container-broker/k8s"
-	"errors"
-	"fmt"
+	"github.com/trustedanalytics/tap-go-common/util"
 )
 
 type ConnectionConfig struct {
-	KubernetesApi         k8s.KubernetesApi
-	CatalogApi            catalogApi.TapCatalogApi
+	KubernetesApi k8s.KubernetesApi
+	CatalogApi    catalogApi.TapCatalogApi
 }
 
 var config *ConnectionConfig
 
-
 func InitConnections() error {
-
 	catalogConnector, err := getCatalogConnector()
 	if err != nil {
 		return errors.New("Can't connect with TAP-NG-catalog!" + err.Error())
@@ -42,9 +39,8 @@ func InitConnections() error {
 	return nil
 }
 
-
 func getCatalogConnector() (*catalogApi.TapCatalogApiConnector, error) {
-	address := getAddressFromK8SEnvs("CATALOG")
+	address := util.GetAddressFromKubernetesEnvs("CATALOG")
 	if os.Getenv("CATALOG_SSL_CERT_FILE_LOCATION") != "" {
 		return catalogApi.NewTapCatalogApiWithSSLAndBasicAuth(
 			"https://"+address,
@@ -61,23 +57,4 @@ func getCatalogConnector() (*catalogApi.TapCatalogApiConnector, error) {
 			os.Getenv("CATALOG_PASS"),
 		)
 	}
-}
-
-func GetQueueConnectionString() string {
-	address := getAddressFromK8SEnvs("QUEUE")
-	user := os.Getenv("QUEUE_USER")
-	pass := os.Getenv("QUEUE_PASS")
-	return fmt.Sprintf("amqp://%v:%v@%v/", user, pass, address)
-}
-
-func getAddressFromK8SEnvs(componentName string) string {
-	serviceName := os.Getenv(componentName + "_KUBERNETES_SERVICE_NAME")
-	if serviceName != "" {
-		hostname := os.Getenv(strings.ToUpper(serviceName) + "_SERVICE_HOST")
-		if hostname != "" {
-			port := os.Getenv(strings.ToUpper(serviceName) + "_SERVICE_PORT")
-			return hostname + ":" + port
-		}
-	}
-	return "localhost" + ":" + os.Getenv(componentName + "_PORT")
 }

@@ -14,25 +14,24 @@
  * limitations under the License.
  */
 
-package main
+package util
 
 import (
+	"os"
+	"os/signal"
 	"sync"
-
-	"github.com/trustedanalytics/tap-go-common/logger"
-	"github.com/trustedanalytics/tap-go-common/util"
-	"github.com/trustedanalytics/tap-monitor/app"
 )
 
-var logger = logger_wrapper.InitLogger("main")
-var waitGroup = &sync.WaitGroup{}
+func GetTerminationObserverChannel() chan os.Signal {
+	channel := make(chan os.Signal, 1)
+	signal.Notify(channel, os.Interrupt)
+	return channel
+}
 
-func main() {
-	go util.TerminationObserver(waitGroup, "Monitor")
-
-	if err := app.InitConnections(); err != nil {
-		logger.Fatal("ERROR initConnections: ", err.Error())
-	}
-
-	app.StartMonitor(waitGroup)
+func TerminationObserver(waitGroup *sync.WaitGroup, appName string) {
+	<-GetTerminationObserverChannel()
+	logger.Info(appName, "is going to be stopped now...")
+	waitGroup.Wait()
+	logger.Info(appName, "stopped!")
+	os.Exit(0)
 }

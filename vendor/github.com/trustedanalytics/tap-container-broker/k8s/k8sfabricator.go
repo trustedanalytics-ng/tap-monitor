@@ -19,6 +19,7 @@ package k8s
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -43,7 +44,7 @@ type KubernetesApi interface {
 	GetPodsStateByServiceId(instanceId string) ([]PodStatus, error)
 	GetPodsStateForAllServices() (map[string][]PodStatus, error)
 	ListDeployments() (*extensions.DeploymentList, error)
-	CreateConfigMap(configMap api.ConfigMap) error
+	CreateConfigMap(configMap *api.ConfigMap) error
 	GetConfigMap(name string) (*api.ConfigMap, error)
 	GetSecret(name string) (*api.Secret, error)
 	CreateSecret(secret api.Secret) error
@@ -52,11 +53,17 @@ type KubernetesApi interface {
 	GetJobs() (*extensions.JobList, error)
 	GetJobsByInstanceId(instanceId string) (*extensions.JobList, error)
 	DeleteJob(jobName string) error
+	GetPod(name string) (*api.Pod, error)
+	CreatePod(pod api.Pod) error
+	DeletePod(podName string) error
+	GetSpecificPodLogs(pod api.Pod) (map[string]string, error)
 	GetPodsLogs(instanceId string) (map[string]string, error)
+	GetJobLogs(job extensions.Job) (map[string]string, error)
 	CreateJob(job *extensions.Job, instanceId string) error
 	ScaleDeploymentAndWait(deployment *extensions.Deployment, replicas int) error
 	UpdateDeployment(deployment *extensions.Deployment) (*extensions.Deployment, error)
 	GetDeployment(name string) (*extensions.Deployment, error)
+	GetIngressHosts(instanceId string) ([]string, error)
 }
 
 type K8Fabricator struct {
@@ -93,6 +100,7 @@ type K8sServiceInfo struct {
 //todo refactor it to instanceId
 const ServiceIdLabel string = "service_id"
 const managedByLabel string = "managed_by"
+const jobName string = "job-name"
 
 func (k *K8Fabricator) FabricateService(instanceId, parameters string, component *model.KubernetesComponent) error {
 	extraEnvironments := []api.EnvVar{{Name: "TAP_K8S", Value: "true"}}
@@ -206,32 +214,89 @@ func (k *K8Fabricator) DeleteJob(jobName string) error {
 	return k.extensionsClient.Jobs(api.NamespaceDefault).Delete(jobName, &api.DeleteOptions{})
 }
 
-func (k *K8Fabricator) GetPodsLogs(instanceId string) (map[string]string, error) {
-	result := map[string]string{}
-
-	secretSelector, err := getSelectorForServiceIdLabel(instanceId)
+func (k *K8Fabricator) GetJobLogs(job extensions.Job) (map[string]string, error) {
+	jobPodsSelector, err := getSelectorBySpecificJob(job)
 	if err != nil {
 		return nil, err
 	}
+	return k.getLogs(jobPodsSelector)
+}
+
+func (k *K8Fabricator) GetSpecificPodLogs(pod api.Pod) (map[string]string, error) {
+	result := make(map[string]string)
+	for _, container := range pod.Spec.Containers {
+		byteBody, err := k.client.Pods(api.NamespaceDefault).GetLogs(pod.Name, &api.PodLogOptions{Container: container.Name}).Do().Raw()
+		if err != nil {
+			logger.Error(fmt.Sprintf("Can't get logs for pod: %s and container: %s", pod.Name, container.Name))
+			return result, err
+		}
+		result[pod.Name+"-"+container.Name] = string(byteBody)
+	}
+	return result, nil
+}
+
+func (k *K8Fabricator) GetPodsLogs(instanceId string) (map[string]string, error) {
+	podsSelector, err := getSelectorForServiceIdLabel(instanceId)
+	if err != nil {
+		return nil, err
+	}
+	return k.getLogs(podsSelector)
+}
+
+func (k *K8Fabricator) getLogs(selector labels.Selector) (map[string]string, error) {
+	result := make(map[string]string)
 
 	pods, err := k.client.Pods(api.NamespaceDefault).List(api.ListOptions{
-		LabelSelector: secretSelector,
+		LabelSelector: selector,
 	})
 	if err != nil {
 		return nil, err
 	}
 
+	if len(pods.Items) == 0 {
+		return result, nil
+	}
+
+	isThereAtLeastOneSuccessGetLogTry := false
 	for _, pod := range pods.Items {
 		for _, container := range pod.Spec.Containers {
 			byteBody, err := k.client.Pods(api.NamespaceDefault).GetLogs(pod.Name, &api.PodLogOptions{
 				Container: container.Name}).Do().Raw()
 			if err != nil {
-				return nil, err
+				logger.Error(fmt.Sprintf("Can't get logs for pod: %s and container: %s", pod.Name, container.Name))
+			} else {
+				isThereAtLeastOneSuccessGetLogTry = true
 			}
 			result[pod.Name+"-"+container.Name] = string(byteBody)
 		}
 	}
-	return result, nil
+	if isThereAtLeastOneSuccessGetLogTry {
+		return result, nil
+	} else {
+		return result, errors.New("Can't fetch logs, err:" + err.Error())
+	}
+}
+
+func (k *K8Fabricator) GetIngressHosts(instanceId string) ([]string, error) {
+	result := []string{}
+	ingresSelector, err := getSelectorForServiceIdLabel(instanceId)
+	if err != nil {
+		return nil, err
+	}
+
+	ingresses, err := k.extensionsClient.Ingress(api.NamespaceDefault).List(api.ListOptions{
+		LabelSelector: ingresSelector,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, ingress := range ingresses.Items {
+		for _, rule := range ingress.Spec.Rules {
+			result = append(result, rule.Host)
+		}
+	}
+	return result, err
 }
 
 func (k *K8Fabricator) DeleteAllByInstanceId(instanceId string) error {
@@ -475,14 +540,31 @@ func (k *K8Fabricator) GetPodsStateForAllServices() (map[string][]PodStatus, err
 	return result, nil
 }
 
+func (k *K8Fabricator) GetPod(name string) (*api.Pod, error) {
+	result, err := k.client.Pods(api.NamespaceDefault).Get(name)
+	if err != nil {
+		return &api.Pod{}, err
+	}
+	return result, nil
+}
+
+func (k *K8Fabricator) CreatePod(pod api.Pod) error {
+	_, err := k.client.Pods(api.NamespaceDefault).Create(&pod)
+	return err
+}
+
+func (k *K8Fabricator) DeletePod(podName string) error {
+	return k.client.Pods(api.NamespaceDefault).Delete(podName, &api.DeleteOptions{})
+}
+
 type ServiceCredential struct {
 	Name  string
 	Host  string
 	Ports []api.ServicePort
 }
 
-func (k *K8Fabricator) CreateConfigMap(configMap api.ConfigMap) error {
-	_, err := k.client.ConfigMaps(api.NamespaceDefault).Create(&configMap)
+func (k *K8Fabricator) CreateConfigMap(configMap *api.ConfigMap) error {
+	_, err := k.client.ConfigMaps(api.NamespaceDefault).Create(configMap)
 	return err
 }
 
@@ -518,8 +600,8 @@ func (k *K8Fabricator) UpdateSecret(secret api.Secret) error {
 }
 
 type PodEnvs struct {
-	RcName     string
-	Containers []ContainerSimple
+	DeploymentName string
+	Containers     []ContainerSimple
 }
 
 type ContainerSimple struct {
@@ -554,7 +636,7 @@ func (k *K8Fabricator) GetAllPodsEnvsByInstanceId(instanceId string) ([]PodEnvs,
 
 	for _, deployment := range deployments.Items {
 		pod := PodEnvs{}
-		pod.RcName = deployment.Name
+		pod.DeploymentName = deployment.Name
 		pod.Containers = []ContainerSimple{}
 
 		for _, container := range deployment.Spec.Template.Spec.Containers {
@@ -615,4 +697,20 @@ func getSelectorForManagedByLabel() (labels.Selector, error) {
 		return selector, err
 	}
 	return selector.Add(*managedByReq), nil
+}
+
+func getSelectorBySpecificJob(job extensions.Job) (labels.Selector, error) {
+	selector := labels.NewSelector()
+	for k, v := range job.Labels {
+		requirement, err := labels.NewRequirement(k, labels.EqualsOperator, sets.NewString(v))
+		if err != nil {
+			return selector, err
+		}
+		selector.Add(*requirement)
+	}
+	jobNameReq, err := labels.NewRequirement(jobName, labels.EqualsOperator, sets.NewString(job.Name))
+	if err != nil {
+		return selector, err
+	}
+	return selector.Add(*jobNameReq), nil
 }
