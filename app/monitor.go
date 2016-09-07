@@ -49,7 +49,7 @@ func StartMonitor(waitGroup *sync.WaitGroup) {
 //todo what we should do in error case: log error and continue or break/fail
 //todo should we change instance state to FAILURE on error case?
 func CheckCatalogRequestedService(channel *amqp.Channel) error {
-	instances, _, err := config.CatalogApi.ListServicesInstances()
+	instances, _, err := config.CatalogApi.ListInstances()
 	if err != nil {
 		return err
 	}
