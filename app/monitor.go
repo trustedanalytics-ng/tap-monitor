@@ -1,7 +1,6 @@
 package app
 
 import (
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -74,46 +73,35 @@ func CheckCatalogRequestedService(channel *amqp.Channel) error {
 	return nil
 }
 
+// todo this needs to be move to api-console CreateApplication endpoint
 func handleCreateInstanceRequest(instance catalogModels.Instance, channel *amqp.Channel) {
+	//todo we need to verify for every service-broker isjntance if service-broker instance is ready already!
 	if instance.Type == catalogModels.InstanceTypeApplication {
 		for {
-			// todo we should use long pool here
-			if imageId := catalogModels.GetValueFromMetadata(instance.Metadata, catalogModels.APPLICATION_IMAGE_ID); imageId != "" {
-				image, _, err := config.CatalogApi.GetImage(imageId)
-				if err != nil {
-					logger.Error(fmt.Sprintf("Can't process instanceId: %s - assigned image has error", instance.Id), err)
-					changeInstanceStatusToFailed(instance.Id)
-				} else if image.State == catalogModels.ImageStateError {
-					logger.Error(fmt.Sprintf("Can't process instanceId: %s - assigned image has wrong state: %s", instance.Id, image.State))
-					changeInstanceStatusToFailed(instance.Id)
-					return
-				} else if image.State == catalogModels.ImageStateReady {
-					break
-				} else {
-					logger.Debug(fmt.Sprintf("InstanceId: %s - waiting for image to be ready. Image state: %s", instance.Id, image.State))
-					time.Sleep(CHECK_INTERVAL_SECONDS * time.Second)
-					continue
-				}
+			app, _, err := config.CatalogApi.GetApplication(instance.ClassId)
+			if err != nil {
+				logger.Error(fmt.Sprintf("Can't process instanceId: %s - GetApplication error", instance.Id), err)
+				return
+			}
+
+			// todo we should use long poll here
+			image, _, err := config.CatalogApi.GetImage(app.ImageId)
+			if err != nil {
+				logger.Error(fmt.Sprintf("Can't process instanceId: %s - GetImage error", instance.Id), err)
+				return
+			} else if image.State == catalogModels.ImageStateError {
+				logger.Error(fmt.Sprintf("Can't process instanceId: %s - assigned image has wrong state: %s", instance.Id, image.State))
+				return
+			} else if image.State == catalogModels.ImageStateReady {
+				break
+			} else {
+				logger.Debug(fmt.Sprintf("InstanceId: %s - waiting for image to be ready. Image state: %s", instance.Id, image.State))
+				time.Sleep(CHECK_INTERVAL_SECONDS * time.Second)
+				continue
 			}
 		}
 	}
 	sendMessageOnQueue(instance, channel, containerBrokerModels.CONTAINER_BROKER_CREATE_ROUTING_KEY)
-}
-
-func changeInstanceStatusToFailed(instanceId string) {
-	stateByte, _ := json.Marshal(catalogModels.InstanceStateDeploying)
-	previousStateByte, _ := json.Marshal(catalogModels.InstanceStateRequested)
-
-	patch := catalogModels.Patch{
-		Operation: catalogModels.OperationUpdate,
-		Field:     "State",
-		Value:     stateByte,
-		PrevValue: previousStateByte,
-	}
-
-	if _, _, err := config.CatalogApi.UpdateInstance(instanceId, []catalogModels.Patch{patch}); err != nil {
-		logger.Error("Can't update instance status to FAILED - instanceId:", instanceId, err)
-	}
 }
 
 func sendMessageOnQueue(instance catalogModels.Instance, channel *amqp.Channel, routingKey string) {
