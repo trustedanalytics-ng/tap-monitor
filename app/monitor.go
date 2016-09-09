@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -12,21 +13,26 @@ import (
 	"github.com/trustedanalytics/tap-go-common/logger"
 	"github.com/trustedanalytics/tap-go-common/queue"
 	"github.com/trustedanalytics/tap-go-common/util"
+	imageFactoryModels "github.com/trustedanalytics/tap-image-factory/models"
 )
 
 var logger = logger_wrapper.InitLogger("app")
+var docker_hub_address = os.Getenv("IMAGE_FACTORY_HUB_ADDRESS")
 
 const CHECK_INTERVAL_SECONDS = 5
 
 // todo this is temporary -> DPNG-10694
 var createInstanceQueue = []string{}
 var deleteInstanceQueue = []string{}
+var pendingImageQueue = []string{}
+var readyImageQueue = []string{}
 
 func StartMonitor(waitGroup *sync.WaitGroup) {
 	waitGroup.Add(1)
 	channel, conn := queue.GetConnectionChannel()
 	queue.CreateExchangeWithQueueByRoutingKeys(channel, containerBrokerModels.CONTAINER_BROKER_QUEUE_NAME,
 		[]string{containerBrokerModels.CONTAINER_BROKER_CREATE_ROUTING_KEY, containerBrokerModels.CONTAINER_BROKER_DELETE_ROUTING_KEY})
+	queue.CreateExchangeWithQueueByRoutingKeys(channel, imageFactoryModels.IMAGE_FACTORY_QUEUE_NAME, []string{imageFactoryModels.IMAGE_FACTORY_IMAGE_ROUTING_KEY})
 
 	isRunning := true
 	go func() {
@@ -35,8 +41,11 @@ func StartMonitor(waitGroup *sync.WaitGroup) {
 	}()
 
 	for isRunning {
-		if err := CheckCatalogRequestedService(channel); err != nil {
-			logger.Error("Proccessing Catalog data error:", err)
+		if err := CheckCatalogRequestedInstances(channel); err != nil {
+			logger.Error("Proccessing Catalog instances error:", err)
+		}
+		if err := CheckCatalogRequestedImages; err != nil {
+			logger.Error("Proccessing Catalog images error:", err)
 		}
 		time.Sleep(CHECK_INTERVAL_SECONDS * time.Second)
 	}
@@ -47,9 +56,78 @@ func StartMonitor(waitGroup *sync.WaitGroup) {
 	waitGroup.Done()
 }
 
+func CheckCatalogRequestedImages(channel *amqp.Channel) error {
+	images, _, err := config.CatalogApi.ListImages()
+	if err != nil {
+		return err
+	}
+
+	for _, image := range images {
+		switch image.State {
+		case catalogModels.ImageStatePending:
+			if isInstanceIdInArray(pendingImageQueue, image.Id) {
+				continue
+			}
+
+			queueMessage, err := prepareBuildImageRequest(image)
+			if err != nil {
+				logger.Error("Failed to prepare BuildImagePostRequest for image: ", image.Id, err)
+				break
+			}
+			if err := queue.SendMessageToQueue(channel, queueMessage, imageFactoryModels.IMAGE_FACTORY_QUEUE_NAME,
+				imageFactoryModels.IMAGE_FACTORY_IMAGE_ROUTING_KEY); err != nil {
+				logger.Error("Can't send message on queue! ImageId:", image.Id, err)
+				break
+			}
+			pendingImageQueue = append(pendingImageQueue, image.Id)
+		case catalogModels.ImageStateReady:
+			if isInstanceIdInArray(readyImageQueue, image.Id) {
+				continue
+			}
+
+			if catalogModels.IsApplicationInstance(image.Id) {
+				applicationId := catalogModels.GetApplicationId(image.Id)
+				instances, _, err := config.CatalogApi.ListApplicationInstances(applicationId)
+				if err != nil {
+					logger.Error("Failed to call ListApplicationInstances for image: ", image.Id, err)
+					break
+				}
+
+				if len(instances) == 1 {
+					application, _, err := config.CatalogApi.GetApplication(applicationId)
+					if err != nil {
+						logger.Error("Failed to call GetApplication for image: ", image.Id, err)
+						break
+					}
+
+					instance := catalogModels.Instance{
+						Name:    application.Name,
+						Type:    catalogModels.InstanceTypeApplication,
+						ClassId: application.Id,
+						Metadata: []catalogModels.Metadata{
+							{Id: catalogModels.APPLICATION_IMAGE_ADDRESS, Value: getImageAddress(image.Id)},
+						},
+					}
+
+					if _, _, err = config.CatalogApi.AddApplicationInstance(application.Id, instance); err != nil {
+						logger.Error("Failed to call AddApplicationInstance for image: ", image.Id, err)
+						break
+					}
+				}
+			}
+			readyImageQueue = append(readyImageQueue, image.Id)
+		}
+	}
+	return nil
+}
+
+func getImageAddress(id string) string {
+	return docker_hub_address + "/" + id
+}
+
 //todo what we should do in error case: log error and continue or break/fail
 //todo should we change instance state to FAILURE on error case?
-func CheckCatalogRequestedService(channel *amqp.Channel) error {
+func CheckCatalogRequestedInstances(channel *amqp.Channel) error {
 	instances, _, err := config.CatalogApi.ListInstances()
 	if err != nil {
 		return err
@@ -60,7 +138,7 @@ func CheckCatalogRequestedService(channel *amqp.Channel) error {
 			if isInstanceIdInArray(createInstanceQueue, instance.Id) {
 				continue
 			}
-			go handleCreateInstanceRequest(instance, channel)
+			go sendMessageOnQueue(instance, channel, containerBrokerModels.CONTAINER_BROKER_CREATE_ROUTING_KEY)
 			createInstanceQueue = append(createInstanceQueue, instance.Id)
 		} else if instance.State == catalogModels.InstanceStateDestroyReq {
 			if isInstanceIdInArray(deleteInstanceQueue, instance.Id) {
@@ -71,37 +149,6 @@ func CheckCatalogRequestedService(channel *amqp.Channel) error {
 		}
 	}
 	return nil
-}
-
-// todo this needs to be move to api-console CreateApplication endpoint
-func handleCreateInstanceRequest(instance catalogModels.Instance, channel *amqp.Channel) {
-	//todo we need to verify for every service-broker isjntance if service-broker instance is ready already!
-	if instance.Type == catalogModels.InstanceTypeApplication {
-		for {
-			app, _, err := config.CatalogApi.GetApplication(instance.ClassId)
-			if err != nil {
-				logger.Error(fmt.Sprintf("Can't process instanceId: %s - GetApplication error", instance.Id), err)
-				return
-			}
-
-			// todo we should use long poll here
-			image, _, err := config.CatalogApi.GetImage(app.ImageId)
-			if err != nil {
-				logger.Error(fmt.Sprintf("Can't process instanceId: %s - GetImage error", instance.Id), err)
-				return
-			} else if image.State == catalogModels.ImageStateError {
-				logger.Error(fmt.Sprintf("Can't process instanceId: %s - assigned image has wrong state: %s", instance.Id, image.State))
-				return
-			} else if image.State == catalogModels.ImageStateReady {
-				break
-			} else {
-				logger.Debug(fmt.Sprintf("InstanceId: %s - waiting for image to be ready. Image state: %s", instance.Id, image.State))
-				time.Sleep(CHECK_INTERVAL_SECONDS * time.Second)
-				continue
-			}
-		}
-	}
-	sendMessageOnQueue(instance, channel, containerBrokerModels.CONTAINER_BROKER_CREATE_ROUTING_KEY)
 }
 
 func sendMessageOnQueue(instance catalogModels.Instance, channel *amqp.Channel, routingKey string) {
@@ -116,7 +163,7 @@ func sendMessageOnQueue(instance catalogModels.Instance, channel *amqp.Channel, 
 			return
 		}
 	case containerBrokerModels.CONTAINER_BROKER_DELETE_ROUTING_KEY:
-		queueMessage, err = prepareDeleteRequest(instance)
+		queueMessage, err = prepareDeleteInstanceRequest(instance)
 		if err != nil {
 			logger.Error("Failed to prepare DeleteRequest for instance: ", instance.Id, err)
 			return
