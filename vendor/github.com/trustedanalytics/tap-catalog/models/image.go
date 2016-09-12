@@ -34,7 +34,7 @@ func IsApplicationInstance(imageId string) bool {
 }
 
 func GetApplicationId(imageId string) string {
-	return strings.TrimLeft(imageId, IMAGE_ID_PREFIX)
+	return strings.TrimPrefix(imageId, IMAGE_ID_PREFIX)
 }
 
 func GenerateImageId(applicationId string) string {
