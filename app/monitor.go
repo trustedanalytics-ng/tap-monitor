@@ -44,7 +44,7 @@ func StartMonitor(waitGroup *sync.WaitGroup) {
 		if err := CheckCatalogRequestedInstances(channel); err != nil {
 			logger.Error("Proccessing Catalog instances error:", err)
 		}
-		if err := CheckCatalogRequestedImages; err != nil {
+		if err := CheckCatalogRequestedImages(channel); err != nil {
 			logger.Error("Proccessing Catalog images error:", err)
 		}
 		time.Sleep(CHECK_INTERVAL_SECONDS * time.Second)
@@ -59,6 +59,7 @@ func StartMonitor(waitGroup *sync.WaitGroup) {
 func CheckCatalogRequestedImages(channel *amqp.Channel) error {
 	images, _, err := config.CatalogApi.ListImages()
 	if err != nil {
+		logger.Error("Failed to ListImages:", err)
 		return err
 	}
 
@@ -93,7 +94,7 @@ func CheckCatalogRequestedImages(channel *amqp.Channel) error {
 					break
 				}
 
-				if len(instances) == 1 {
+				if len(instances) == 0 {
 					application, _, err := config.CatalogApi.GetApplication(applicationId)
 					if err != nil {
 						logger.Error("Failed to call GetApplication for image: ", image.Id, err)

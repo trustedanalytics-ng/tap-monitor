@@ -2,7 +2,7 @@ package models
 
 import "strings"
 
-const IMAGE_ID_PREFIX = "image_"
+const IMAGE_ID_PREFIX = "image-"
 
 type Image struct {
 	Id         string     `json:"id"`
