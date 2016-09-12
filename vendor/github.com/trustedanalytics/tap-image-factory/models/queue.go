@@ -16,8 +16,24 @@
 
 package models
 
+import "github.com/trustedanalytics/tap-catalog/models"
+
 const (
-	CONTAINER_BROKER_QUEUE_NAME         = "tap-container-broker"
-	CONTAINER_BROKER_CREATE_ROUTING_KEY = "create"
-	CONTAINER_BROKER_DELETE_ROUTING_KEY = "delete"
+	IMAGE_FACTORY_QUEUE_NAME        = "tap-image-factory"
+	IMAGE_FACTORY_IMAGE_ROUTING_KEY = "image"
 )
+
+type ImageGetResponse struct {
+	ImageId    string `json:"id"`
+	Type       string `json:"type"`
+	State      string `json:"state"`
+	AuditTrail models.AuditTrail
+}
+
+type ImageStatePutRequest struct {
+	State string `json:"state"`
+}
+
+type BuildImagePostRequest struct {
+	ImageId string `json:"id"`
+}

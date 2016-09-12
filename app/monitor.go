@@ -1,6 +1,9 @@
 package app
 
 import (
+	"fmt"
+	"os"
+	"sync"
 	"time"
 
 	"github.com/streadway/amqp"
@@ -10,22 +13,26 @@ import (
 	"github.com/trustedanalytics/tap-go-common/logger"
 	"github.com/trustedanalytics/tap-go-common/queue"
 	"github.com/trustedanalytics/tap-go-common/util"
-	"sync"
+	imageFactoryModels "github.com/trustedanalytics/tap-image-factory/models"
 )
 
 var logger = logger_wrapper.InitLogger("app")
+var docker_hub_address = os.Getenv("IMAGE_FACTORY_HUB_ADDRESS")
 
 const CHECK_INTERVAL_SECONDS = 5
 
 // todo this is temporary -> DPNG-10694
 var createInstanceQueue = []string{}
 var deleteInstanceQueue = []string{}
+var pendingImageQueue = []string{}
+var readyImageQueue = []string{}
 
 func StartMonitor(waitGroup *sync.WaitGroup) {
 	waitGroup.Add(1)
 	channel, conn := queue.GetConnectionChannel()
 	queue.CreateExchangeWithQueueByRoutingKeys(channel, containerBrokerModels.CONTAINER_BROKER_QUEUE_NAME,
 		[]string{containerBrokerModels.CONTAINER_BROKER_CREATE_ROUTING_KEY, containerBrokerModels.CONTAINER_BROKER_DELETE_ROUTING_KEY})
+	queue.CreateExchangeWithQueueByRoutingKeys(channel, imageFactoryModels.IMAGE_FACTORY_QUEUE_NAME, []string{imageFactoryModels.IMAGE_FACTORY_IMAGE_ROUTING_KEY})
 
 	isRunning := true
 	go func() {
@@ -34,8 +41,11 @@ func StartMonitor(waitGroup *sync.WaitGroup) {
 	}()
 
 	for isRunning {
-		if err := CheckCatalogRequestedService(channel); err != nil {
-			logger.Error("Proccessing Catalog data error:", err)
+		if err := CheckCatalogRequestedInstances(channel); err != nil {
+			logger.Error("Proccessing Catalog instances error:", err)
+		}
+		if err := CheckCatalogRequestedImages(channel); err != nil {
+			logger.Error("Proccessing Catalog images error:", err)
 		}
 		time.Sleep(CHECK_INTERVAL_SECONDS * time.Second)
 	}
@@ -46,9 +56,79 @@ func StartMonitor(waitGroup *sync.WaitGroup) {
 	waitGroup.Done()
 }
 
+func CheckCatalogRequestedImages(channel *amqp.Channel) error {
+	images, _, err := config.CatalogApi.ListImages()
+	if err != nil {
+		logger.Error("Failed to ListImages:", err)
+		return err
+	}
+
+	for _, image := range images {
+		switch image.State {
+		case catalogModels.ImageStatePending:
+			if isInstanceIdInArray(pendingImageQueue, image.Id) {
+				continue
+			}
+
+			queueMessage, err := prepareBuildImageRequest(image)
+			if err != nil {
+				logger.Error("Failed to prepare BuildImagePostRequest for image: ", image.Id, err)
+				break
+			}
+			if err := queue.SendMessageToQueue(channel, queueMessage, imageFactoryModels.IMAGE_FACTORY_QUEUE_NAME,
+				imageFactoryModels.IMAGE_FACTORY_IMAGE_ROUTING_KEY); err != nil {
+				logger.Error("Can't send message on queue! ImageId:", image.Id, err)
+				break
+			}
+			pendingImageQueue = append(pendingImageQueue, image.Id)
+		case catalogModels.ImageStateReady:
+			if isInstanceIdInArray(readyImageQueue, image.Id) {
+				continue
+			}
+
+			if catalogModels.IsApplicationInstance(image.Id) {
+				applicationId := catalogModels.GetApplicationId(image.Id)
+				instances, _, err := config.CatalogApi.ListApplicationInstances(applicationId)
+				if err != nil {
+					logger.Error("Failed to call ListApplicationInstances for image: ", image.Id, err)
+					break
+				}
+
+				if len(instances) == 0 {
+					application, _, err := config.CatalogApi.GetApplication(applicationId)
+					if err != nil {
+						logger.Error("Failed to call GetApplication for image: ", image.Id, err)
+						break
+					}
+
+					instance := catalogModels.Instance{
+						Name:    application.Name,
+						Type:    catalogModels.InstanceTypeApplication,
+						ClassId: application.Id,
+						Metadata: []catalogModels.Metadata{
+							{Id: catalogModels.APPLICATION_IMAGE_ADDRESS, Value: getImageAddress(image.Id)},
+						},
+					}
+
+					if _, _, err = config.CatalogApi.AddApplicationInstance(application.Id, instance); err != nil {
+						logger.Error("Failed to call AddApplicationInstance for image: ", image.Id, err)
+						break
+					}
+				}
+			}
+			readyImageQueue = append(readyImageQueue, image.Id)
+		}
+	}
+	return nil
+}
+
+func getImageAddress(id string) string {
+	return docker_hub_address + "/" + id
+}
+
 //todo what we should do in error case: log error and continue or break/fail
 //todo should we change instance state to FAILURE on error case?
-func CheckCatalogRequestedService(channel *amqp.Channel) error {
+func CheckCatalogRequestedInstances(channel *amqp.Channel) error {
 	instances, _, err := config.CatalogApi.ListInstances()
 	if err != nil {
 		return err
@@ -57,39 +137,47 @@ func CheckCatalogRequestedService(channel *amqp.Channel) error {
 	for _, instance := range instances {
 		if instance.State == catalogModels.InstanceStateRequested {
 			if isInstanceIdInArray(createInstanceQueue, instance.Id) {
-				break
+				continue
 			}
-
-			queueMessage, err := prepareCreateInstanceRequest(instance)
-			if err != nil {
-				logger.Error("Failed to prepare Message for instance: ", instance.Id, err)
-				return err
-			}
-
-			if err := queue.SendMessageToQueue(channel, queueMessage, containerBrokerModels.CONTAINER_BROKER_QUEUE_NAME,
-				containerBrokerModels.CONTAINER_BROKER_CREATE_ROUTING_KEY); err != nil {
-				return err
-			}
+			go sendMessageOnQueue(instance, channel, containerBrokerModels.CONTAINER_BROKER_CREATE_ROUTING_KEY)
 			createInstanceQueue = append(createInstanceQueue, instance.Id)
 		} else if instance.State == catalogModels.InstanceStateDestroyReq {
 			if isInstanceIdInArray(deleteInstanceQueue, instance.Id) {
-				break
-			}
-
-			queueMessage, err := prepareDeleteRequest(instance)
-			if err != nil {
-				logger.Error("Failed to prepare Message for instance: ", instance.Id, err)
-				return err
-			}
-
-			if err := queue.SendMessageToQueue(channel, queueMessage, containerBrokerModels.CONTAINER_BROKER_QUEUE_NAME,
-				containerBrokerModels.CONTAINER_BROKER_DELETE_ROUTING_KEY); err != nil {
-				return err
+				continue
 			}
 			deleteInstanceQueue = append(deleteInstanceQueue, instance.Id)
+			go sendMessageOnQueue(instance, channel, containerBrokerModels.CONTAINER_BROKER_DELETE_ROUTING_KEY)
 		}
 	}
 	return nil
+}
+
+func sendMessageOnQueue(instance catalogModels.Instance, channel *amqp.Channel, routingKey string) {
+	var queueMessage []byte
+	var err error
+
+	switch routingKey {
+	case containerBrokerModels.CONTAINER_BROKER_CREATE_ROUTING_KEY:
+		queueMessage, err = prepareCreateInstanceRequest(instance)
+		if err != nil {
+			logger.Error("Failed to prepare CreateInstanceRequest for instance: ", instance.Id, err)
+			return
+		}
+	case containerBrokerModels.CONTAINER_BROKER_DELETE_ROUTING_KEY:
+		queueMessage, err = prepareDeleteInstanceRequest(instance)
+		if err != nil {
+			logger.Error("Failed to prepare DeleteRequest for instance: ", instance.Id, err)
+			return
+		}
+	default:
+		logger.Error(fmt.Sprintf("InstanceId: %s- following routing key is not supported: %s", instance.Id, routingKey))
+		return
+	}
+
+	if err := queue.SendMessageToQueue(channel, queueMessage, containerBrokerModels.CONTAINER_BROKER_QUEUE_NAME, routingKey); err != nil {
+		logger.Error("Can't send message on queue! InstanceId:", instance.Id, err)
+		return
+	}
 }
 
 // this method supposed to call directly to ETCD (using long pool) for check if specific instance status will change in e.g. next 10 minutes
