@@ -82,7 +82,7 @@ func (q *QueueManager) CheckCatalogRequestedImages() error {
 				continue
 			}
 			pendingImageQueue = append(pendingImageQueue, image.Id)
-			q.sendMessageOnQueue(image, imageFactoryModels.IMAGE_FACTORY_QUEUE_NAME, containerBrokerModels.CONTAINER_BROKER_CREATE_ROUTING_KEY)
+			q.sendMessageOnQueue(image, imageFactoryModels.IMAGE_FACTORY_QUEUE_NAME, imageFactoryModels.IMAGE_FACTORY_IMAGE_ROUTING_KEY)
 		case catalogModels.ImageStateReady:
 			if isInstanceIdInArray(readyImageQueue, image.Id) {
 				continue
