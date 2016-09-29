@@ -195,8 +195,7 @@ func (q *QueueManager) sendMessageAndReconnectIfError(message []byte, queueName,
 		q.Connection = conn
 
 		if err := queue.SendMessageToQueue(q.Channel, message, queueName, routingKey); err != nil {
-			logger.Fatalf("Can't send message on queue! err:", err)
-
+			logger.Fatalf("Can't send message on queue! err: %v", err)
 		}
 	}
 }

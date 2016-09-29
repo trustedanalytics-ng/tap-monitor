@@ -16,16 +16,22 @@ type ConnectionConfig struct {
 
 var config *ConnectionConfig
 
+var getAddressFromKubernetesEnvs = util.GetAddressFromKubernetesEnvs
+var getEnv = os.Getenv
+var newTapCatalogApiWithSSLAndBasicAuth = catalogApi.NewTapCatalogApiWithSSLAndBasicAuth
+var newTapCatalogApiWithBasicAuth = catalogApi.NewTapCatalogApiWithBasicAuth
+var getNewK8FabricatorInstance = k8s.GetNewK8FabricatorInstance
+
 func InitConnections() error {
 	catalogConnector, err := getCatalogConnector()
 	if err != nil {
 		return errors.New("Can't connect with TAP-NG-catalog!" + err.Error())
 	}
 
-	kubernetesApiConnector, err := k8s.GetNewK8FabricatorInstance(k8s.K8sClusterCredentials{
-		Server:   os.Getenv("K8S_API_ADDRESS"),
-		Username: os.Getenv("K8S_API_USERNAME"),
-		Password: os.Getenv("K8S_API_PASSWORD"),
+	kubernetesApiConnector, err := getNewK8FabricatorInstance(k8s.K8sClusterCredentials{
+		Server:   getEnv("K8S_API_ADDRESS"),
+		Username: getEnv("K8S_API_USERNAME"),
+		Password: getEnv("K8S_API_PASSWORD"),
 	})
 
 	if err != nil {
@@ -40,21 +46,21 @@ func InitConnections() error {
 }
 
 func getCatalogConnector() (*catalogApi.TapCatalogApiConnector, error) {
-	address := util.GetAddressFromKubernetesEnvs("CATALOG")
-	if os.Getenv("CATALOG_SSL_CERT_FILE_LOCATION") != "" {
-		return catalogApi.NewTapCatalogApiWithSSLAndBasicAuth(
+	address := getAddressFromKubernetesEnvs("CATALOG")
+	if getEnv("CATALOG_SSL_CERT_FILE_LOCATION") != "" {
+		return newTapCatalogApiWithSSLAndBasicAuth(
 			"https://"+address,
-			os.Getenv("CATALOG_USER"),
-			os.Getenv("CATALOG_PASS"),
-			os.Getenv("CATALOG_SSL_CERT_FILE_LOCATION"),
-			os.Getenv("CATALOG_SSL_KEY_FILE_LOCATION"),
-			os.Getenv("CATALOG_SSL_CA_FILE_LOCATION"),
+			getEnv("CATALOG_USER"),
+			getEnv("CATALOG_PASS"),
+			getEnv("CATALOG_SSL_CERT_FILE_LOCATION"),
+			getEnv("CATALOG_SSL_KEY_FILE_LOCATION"),
+			getEnv("CATALOG_SSL_CA_FILE_LOCATION"),
 		)
 	} else {
-		return catalogApi.NewTapCatalogApiWithBasicAuth(
+		return newTapCatalogApiWithBasicAuth(
 			"http://"+address,
-			os.Getenv("CATALOG_USER"),
-			os.Getenv("CATALOG_PASS"),
+			getEnv("CATALOG_USER"),
+			getEnv("CATALOG_PASS"),
 		)
 	}
 }
