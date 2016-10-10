@@ -303,16 +303,16 @@
 			"revisionTime": "2016-03-11T21:55:03Z"
 		},
 		{
-			"checksumSHA1": "MhYPSiQvGo87Fd2QEOBJY96pHBU=",
+			"checksumSHA1": "3TnrKs4xAsp9UnNSfC2DqlEfMp4=",
 			"path": "github.com/trustedanalytics/tap-catalog/client",
-			"revision": "d6a46ad46e95503bf08bca900214815d665da042",
-			"revisionTime": "2016-09-14T14:46:39Z"
+			"revision": "e63f0720f4344e920a8fe99a70ef3c8d9dc532d8",
+			"revisionTime": "2016-10-06T06:29:10Z"
 		},
 		{
-			"checksumSHA1": "FUT1NP/+zfZ/VUo9Rjlq4DRWHCo=",
+			"checksumSHA1": "iTyqcoqjdhNzFcVazs0NqQhI8u0=",
 			"path": "github.com/trustedanalytics/tap-catalog/models",
-			"revision": "d6a46ad46e95503bf08bca900214815d665da042",
-			"revisionTime": "2016-09-14T14:46:39Z"
+			"revision": "e63f0720f4344e920a8fe99a70ef3c8d9dc532d8",
+			"revisionTime": "2016-10-06T06:29:10Z"
 		},
 		{
 			"checksumSHA1": "c/px3dadt5FH+TS1ricyUJ0g3VI=",

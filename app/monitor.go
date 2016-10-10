@@ -84,6 +84,15 @@ func setupQueueConnection() (*amqp.Channel, *amqp.Connection) {
 	return channel, conn
 }
 
+func convertDependenciesToBindings(dependencies []catalogModels.InstanceDependency) []catalogModels.InstanceBindings {
+	result := make([]catalogModels.InstanceBindings, len(dependencies))
+	for i, dependency := range dependencies {
+		result[i].Id = dependency.Id
+	}
+
+	return result
+}
+
 func (q *QueueManager) CheckCatalogRequestedImages() error {
 	images, _, err := config.CatalogApi.ListImages()
 	if err != nil {
@@ -121,9 +130,10 @@ func (q *QueueManager) CheckCatalogRequestedImages() error {
 					}
 
 					instance := catalogModels.Instance{
-						Name:    application.Name,
-						Type:    catalogModels.InstanceTypeApplication,
-						ClassId: application.Id,
+						Name:     application.Name,
+						Type:     catalogModels.InstanceTypeApplication,
+						ClassId:  application.Id,
+						Bindings: convertDependenciesToBindings(application.InstanceDependencies),
 						Metadata: []catalogModels.Metadata{
 							{Id: catalogModels.APPLICATION_IMAGE_ADDRESS, Value: getImageAddress(image.Id)},
 						},
