@@ -21,6 +21,7 @@ import (
 	"os"
 
 	catalogApi "github.com/trustedanalytics/tap-catalog/client"
+	cephBrokerApi "github.com/trustedanalytics/tap-ceph-broker/client"
 	"github.com/trustedanalytics/tap-container-broker/k8s"
 	"github.com/trustedanalytics/tap-go-common/util"
 )
@@ -41,14 +42,19 @@ var getNewK8FabricatorInstance = k8s.GetNewK8FabricatorInstance
 func InitConnections() error {
 	catalogConnector, err := getCatalogConnector()
 	if err != nil {
-		return errors.New("Can't connect with TAP-NG-catalog!" + err.Error())
+		return errors.New("Can't connect with TAP-catalog!" + err.Error())
+	}
+
+	cephBrokerConnector, err := getCephBrokerConnector()
+	if err != nil {
+		logger.Fatal("Can't connect with TAP-ceph-broker!", err)
 	}
 
 	kubernetesApiConnector, err := getNewK8FabricatorInstance(k8s.K8sClusterCredentials{
 		Server:   getEnv("K8S_API_ADDRESS"),
 		Username: getEnv("K8S_API_USERNAME"),
 		Password: getEnv("K8S_API_PASSWORD"),
-	})
+	}, cephBrokerConnector)
 
 	if err != nil {
 		return errors.New("Can't connect with K8S!" + err.Error())
@@ -77,6 +83,25 @@ func getCatalogConnector() (*catalogApi.TapCatalogApiConnector, error) {
 			"http://"+address,
 			getEnv("CATALOG_USER"),
 			getEnv("CATALOG_PASS"),
+		)
+	}
+}
+
+func getCephBrokerConnector() (*cephBrokerApi.CephBrokerConnector, error) {
+	if os.Getenv("CEPH_BROKER_SSL_CERT_FILE_LOCATION") != "" {
+		return cephBrokerApi.NewCephBrokerCa(
+			"https://"+os.Getenv("CEPH_BROKER_ADDRESS"),
+			os.Getenv("CEPH_BROKER_USER"),
+			os.Getenv("CEPH_BROKER_PASS"),
+			os.Getenv("CEPH_BROKER_SSL_CERT_FILE_LOCATION"),
+			os.Getenv("CEPH_BROKER_SSL_KEY_FILE_LOCATION"),
+			os.Getenv("CEPH_BROKER_SSL_CA_FILE_LOCATION"),
+		)
+	} else {
+		return cephBrokerApi.NewCephBrokerBasicAuth(
+			"http://"+os.Getenv("CEPH_BROKER_ADDRESS"),
+			os.Getenv("CEPH_BROKER_USER"),
+			os.Getenv("CEPH_BROKER_PASS"),
 		)
 	}
 }

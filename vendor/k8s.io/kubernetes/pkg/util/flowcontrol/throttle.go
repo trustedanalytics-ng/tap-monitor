@@ -52,7 +52,6 @@ func (t *tokenBucketRateLimiter) TryAccept() bool {
 }
 
 func (t *tokenBucketRateLimiter) Saturation() float64 {
-
 	return 1.0
 }
 

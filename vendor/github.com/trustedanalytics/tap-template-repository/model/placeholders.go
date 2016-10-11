@@ -22,11 +22,13 @@ const (
 	PLACEHOLDER_DOMAIN_NAME = "domain_name"
 	PLACEHOLDER_IMAGE       = "image"
 	PLACEHOLDER_HOSTNAME    = "hostname"
+	PLACEHOLDER_EXTRA_ENVS  = "extra_envs"
 
+	PLACEHOLDER_INSTANCE_NAME             = "instance_name"
 	PLACEHOLDER_INSTANCE_ID               = "instance_id"
 	PLACEHOLDER_IDX_AND_SHORT_INSTANCE_ID = "idx_and_short_instance_id"
 	PLACEHOLDER_SHORT_INSTANCE_ID         = "short_instance_id"
-	PLACEHOLDER_BINDED_INSTANCE_ID        = "binded_instance_id"
+	PLACEHOLDER_BOUND_INSTANCE_ID         = "bound_instance_id"
 
 	PLACEHOLDER_BROKER_SHORT_INSTANCE_ID = "broker_short_instance_id"
 	PLACEHOLDER_BROKER_INSTANCE_ID       = "broker_instance_id"
@@ -38,6 +40,12 @@ const (
 	PLACEHOLDER_PLAN_ID               = "plan_id"
 	PLACEHOLDER_SOURCE_OFFERING_ID    = "source_offering_id"
 	PLACEHOLDER_SOURCE_PLAN_ID_PREFIX = "source_plan_id-"
+
+	PLACEHOLDER_CEPH_USER        = "ceph_user"
+	PLACEHOLDER_CEPH_SECRET_NAME = "ceph_secret_name"
+	PLACEHOLDER_CEPH_MONITORS    = "ceph_monitors"
+	PLACEHOLDER_CEPH_POOL        = "ceph_pool"
+	PLACEHOLDER_CEPH_FS_TYPE     = "ceph_fs_type"
 )
 
 func GetPlaceholderWithDollarPrefix(placeholder string) string {

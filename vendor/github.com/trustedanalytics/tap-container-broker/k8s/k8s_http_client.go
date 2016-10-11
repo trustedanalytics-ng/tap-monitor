@@ -53,13 +53,13 @@ type KubernetesClient interface {
 }
 
 type ExtensionsInterface interface {
-	HorizontalPodAutoscalers(namespace string) k8sClient.HorizontalPodAutoscalerInterface
+	NetworkPolicies(namespace string) k8sClient.NetworkPolicyInterface
 	Scales(namespace string) k8sClient.ScaleInterface
 	DaemonSets(namespace string) k8sClient.DaemonSetInterface
 	Deployments(namespace string) k8sClient.DeploymentInterface
 	Jobs(namespace string) k8sClient.JobInterface
 	Ingress(namespace string) k8sClient.IngressInterface
-	ThirdPartyResources(namespace string) k8sClient.ThirdPartyResourceInterface
+	ThirdPartyResources() k8sClient.ThirdPartyResourceInterface
 	ReplicaSets(namespace string) k8sClient.ReplicaSetInterface
 	PodSecurityPolicies() k8sClient.PodSecurityPolicyInterface
 }

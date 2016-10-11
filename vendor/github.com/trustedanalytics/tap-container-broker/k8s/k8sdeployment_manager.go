@@ -21,6 +21,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/labels"
+
+	"github.com/trustedanalytics/tap-ceph-broker/client"
 )
 
 type DeploymentManager interface {
@@ -31,11 +33,12 @@ type DeploymentManager interface {
 }
 
 type DeploymentConnector struct {
-	client ExtensionsInterface
+	client     ExtensionsInterface
+	cephClient client.CephBroker
 }
 
-func NewDeploymentControllerManager(client ExtensionsInterface) *DeploymentConnector {
-	return &DeploymentConnector{client: client}
+func NewDeploymentControllerManager(client ExtensionsInterface, cephClient client.CephBroker) *DeploymentConnector {
+	return &DeploymentConnector{client: client, cephClient: cephClient}
 }
 
 func (r *DeploymentConnector) DeleteAll(selector labels.Selector) error {
@@ -53,6 +56,11 @@ func (r *DeploymentConnector) DeleteAll(selector labels.Selector) error {
 			logger.Error("UpdateReplicasNumber for deployment failed:", err)
 			return err
 		}
+
+		if err := processDeploymentVolumes(deployment, r.cephClient, false); err != nil {
+			return err
+		}
+
 		logger.Debug("Deleting deployment:", name)
 		err = r.client.Deployments(api.NamespaceDefault).Delete(name, &api.DeleteOptions{})
 		if err != nil {
@@ -69,7 +77,7 @@ func (r *DeploymentConnector) UpdateReplicasNumber(name string, count int) error
 	if err != nil {
 		return err
 	}
-	deploymnet.Spec.Replicas = count
+	deploymnet.Spec.Replicas = int32(count)
 	if _, err = r.client.Deployments(api.NamespaceDefault).Update(deploymnet); err != nil {
 		return err
 	}

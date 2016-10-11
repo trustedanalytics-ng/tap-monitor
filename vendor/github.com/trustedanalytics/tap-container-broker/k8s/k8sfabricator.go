@@ -17,24 +17,29 @@
 package k8s
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientK8s "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 
+	"github.com/trustedanalytics/tap-ceph-broker/client"
 	"github.com/trustedanalytics/tap-template-repository/model"
 )
 
+const (
+	NotFound string = "not found"
+)
+
 type KubernetesApi interface {
-	FabricateService(instanceId, parameters string, component *model.KubernetesComponent) error
+	FabricateService(instanceId string, parameters map[string]string, component *model.KubernetesComponent) error
 	DeleteAllByInstanceId(instanceId string) error
 	DeleteAllPersistentVolumeClaims() error
 	GetAllPersistentVolumes() ([]api.PersistentVolume, error)
@@ -50,16 +55,16 @@ type KubernetesApi interface {
 	CreateSecret(secret api.Secret) error
 	DeleteSecret(name string) error
 	UpdateSecret(secret api.Secret) error
-	GetJobs() (*extensions.JobList, error)
-	GetJobsByInstanceId(instanceId string) (*extensions.JobList, error)
+	GetJobs() (*batch.JobList, error)
+	GetJobsByInstanceId(instanceId string) (*batch.JobList, error)
 	DeleteJob(jobName string) error
 	GetPod(name string) (*api.Pod, error)
 	CreatePod(pod api.Pod) error
 	DeletePod(podName string) error
 	GetSpecificPodLogs(pod api.Pod) (map[string]string, error)
 	GetPodsLogs(instanceId string) (map[string]string, error)
-	GetJobLogs(job extensions.Job) (map[string]string, error)
-	CreateJob(job *extensions.Job, instanceId string) error
+	GetJobLogs(job batch.Job) (map[string]string, error)
+	CreateJob(job *batch.Job, instanceId string) error
 	ScaleDeploymentAndWait(deployment *extensions.Deployment, replicas int) error
 	UpdateDeployment(deployment *extensions.Deployment) (*extensions.Deployment, error)
 	GetDeployment(name string) (*extensions.Deployment, error)
@@ -69,9 +74,10 @@ type KubernetesApi interface {
 type K8Fabricator struct {
 	client           KubernetesClient
 	extensionsClient ExtensionsInterface
+	cephClient       client.CephBroker
 }
 
-func GetNewK8FabricatorInstance(creds K8sClusterCredentials) (*K8Fabricator, error) {
+func GetNewK8FabricatorInstance(creds K8sClusterCredentials, cephClient client.CephBroker) (*K8Fabricator, error) {
 	result := K8Fabricator{}
 	client, err := GetNewClient(creds)
 	if err != nil {
@@ -85,34 +91,25 @@ func GetNewK8FabricatorInstance(creds K8sClusterCredentials) (*K8Fabricator, err
 
 	result.client = client
 	result.extensionsClient = extensionClient
+	result.cephClient = cephClient
 	return &result, err
 }
 
 const InstanceIdLabel string = "instance_id"
 const managedByLabel string = "managed_by"
 const jobName string = "job-name"
+const defaultCephImageSizeMB = 200
 
-func (k *K8Fabricator) FabricateService(instanceId, parameters string, component *model.KubernetesComponent) error {
+func (k *K8Fabricator) FabricateService(instanceId string, parameters map[string]string, component *model.KubernetesComponent) error {
 	extraEnvironments := []api.EnvVar{{Name: "TAP_K8S", Value: "true"}}
-	if parameters != "" {
-		extraUserParam := api.EnvVar{}
-		err := json.Unmarshal([]byte(parameters), &extraUserParam)
-		if err != nil {
-			logger.Error("Unmarshalling extra user parameters error!", err)
-			return err
+	for key, value := range parameters {
+		extraUserParam := api.EnvVar{
+			Name:  ConvertToProperEnvName(key),
+			Value: value,
 		}
-
-		if extraUserParam.Name != "" {
-			// kubernetes env name validation:
-			// "must be a C identifier (matching regex [A-Za-z_][A-Za-z0-9_]*): e.g. \"my_name\" or \"MyName\"","
-			extraUserParam.Name = extraUserParam.Name + "_" + instanceId
-			extraUserParam.Name = strings.Replace(extraUserParam.Name, "_", "__", -1) //name_1 --> name__1__instanceId
-			extraUserParam.Name = strings.Replace(extraUserParam.Name, "-", "_", -1)  //name-1 --> name_1__instanceId
-
-			extraEnvironments = append(extraEnvironments, extraUserParam)
-		}
-		logger.Debug("Extra parameters value:", extraEnvironments)
+		extraEnvironments = append(extraEnvironments, extraUserParam)
 	}
+	logger.Debugf("Intance: %s extra parameters value: %v", instanceId, extraEnvironments)
 
 	for _, sc := range component.Secrets {
 		if _, err := k.client.Secrets(api.NamespaceDefault).Create(sc); err != nil {
@@ -129,6 +126,10 @@ func (k *K8Fabricator) FabricateService(instanceId, parameters string, component
 	for _, deployment := range component.Deployments {
 		for i, container := range deployment.Spec.Template.Spec.Containers {
 			deployment.Spec.Template.Spec.Containers[i].Env = append(container.Env, extraEnvironments...)
+		}
+
+		if err := processDeploymentVolumes(*deployment, k.cephClient, true); err != nil {
+			return err
 		}
 
 		if _, err := k.extensionsClient.Deployments(api.NamespaceDefault).Create(deployment); err != nil {
@@ -157,7 +158,7 @@ func (k *K8Fabricator) FabricateService(instanceId, parameters string, component
 }
 
 func (k *K8Fabricator) ScaleDeploymentAndWait(deployment *extensions.Deployment, replicas int) error {
-	deployment.Spec.Replicas = replicas
+	deployment.Spec.Replicas = int32(replicas)
 	if _, err := k.extensionsClient.Deployments(api.NamespaceDefault).Update(deployment); err != nil {
 		return err
 	}
@@ -172,13 +173,13 @@ func (k *K8Fabricator) GetDeployment(name string) (*extensions.Deployment, error
 	return k.extensionsClient.Deployments(api.NamespaceDefault).Get(name)
 }
 
-func (k *K8Fabricator) CreateJob(job *extensions.Job, instanceId string) error {
+func (k *K8Fabricator) CreateJob(job *batch.Job, instanceId string) error {
 	logger.Debug("Creating Job. InstanceId:", instanceId)
 	_, err := k.extensionsClient.Jobs(api.NamespaceDefault).Create(job)
 	return err
 }
 
-func (k *K8Fabricator) GetJobs() (*extensions.JobList, error) {
+func (k *K8Fabricator) GetJobs() (*batch.JobList, error) {
 	selector, err := getSelectorForManagedByLabel()
 	if err != nil {
 		return nil, err
@@ -189,7 +190,7 @@ func (k *K8Fabricator) GetJobs() (*extensions.JobList, error) {
 	})
 }
 
-func (k *K8Fabricator) GetJobsByInstanceId(instanceId string) (*extensions.JobList, error) {
+func (k *K8Fabricator) GetJobsByInstanceId(instanceId string) (*batch.JobList, error) {
 	selector, err := getSelectorForInstanceIdLabel(instanceId)
 	if err != nil {
 		return nil, err
@@ -204,7 +205,7 @@ func (k *K8Fabricator) DeleteJob(jobName string) error {
 	return k.extensionsClient.Jobs(api.NamespaceDefault).Delete(jobName, &api.DeleteOptions{})
 }
 
-func (k *K8Fabricator) GetJobLogs(job extensions.Job) (map[string]string, error) {
+func (k *K8Fabricator) GetJobLogs(job batch.Job) (map[string]string, error) {
 	jobPodsSelector, err := getSelectorBySpecificJob(job)
 	if err != nil {
 		return nil, err
@@ -347,7 +348,7 @@ func (k *K8Fabricator) DeleteAllByInstanceId(instanceId string) error {
 		}
 	}
 
-	if err = NewDeploymentControllerManager(k.extensionsClient).DeleteAll(selector); err != nil {
+	if err = NewDeploymentControllerManager(k.extensionsClient, k.cephClient).DeleteAll(selector); err != nil {
 		logger.Error("Delete deployment failed:", err)
 		return err
 	}
@@ -470,14 +471,15 @@ func (k *K8Fabricator) ListDeployments() (*extensions.DeploymentList, error) {
 		return nil, err
 	}
 
-	return NewDeploymentControllerManager(k.extensionsClient).List(selector)
+	return NewDeploymentControllerManager(k.extensionsClient, k.cephClient).List(selector)
 }
 
 type PodStatus struct {
-	PodName       string
-	InstanceId    string
-	Status        api.PodPhase
-	StatusMessage string
+	PodName         string
+	InstanceId      string
+	Status          api.PodPhase
+	StatusMessage   string
+	ContainerStatus []api.ContainerStatus
 }
 
 func (k *K8Fabricator) GetPodsStateByInstanceId(instanceId string) ([]PodStatus, error) {
@@ -496,7 +498,7 @@ func (k *K8Fabricator) GetPodsStateByInstanceId(instanceId string) ([]PodStatus,
 
 	for _, pod := range pods.Items {
 		podStatus := PodStatus{
-			pod.Name, instanceId, pod.Status.Phase, pod.Status.Message,
+			pod.Name, instanceId, pod.Status.Phase, pod.Status.Message, pod.Status.ContainerStatuses,
 		}
 		result = append(result, podStatus)
 	}
@@ -522,7 +524,7 @@ func (k *K8Fabricator) GetPodsStateForAllServices() (map[string][]PodStatus, err
 		instanceId := pod.Labels[InstanceIdLabel]
 		if instanceId != "" {
 			podStatus := PodStatus{
-				pod.Name, instanceId, pod.Status.Phase, pod.Status.Message,
+				pod.Name, instanceId, pod.Status.Phase, pod.Status.Message, pod.Status.ContainerStatuses,
 			}
 			result[instanceId] = append(result[instanceId], podStatus)
 		}
@@ -607,13 +609,13 @@ func (k *K8Fabricator) GetAllPodsEnvsByInstanceId(instanceId string) ([]PodEnvs,
 		return result, err
 	}
 
-	deployments, err := NewDeploymentControllerManager(k.extensionsClient).List(selector)
+	deployments, err := NewDeploymentControllerManager(k.extensionsClient, k.cephClient).List(selector)
 	if err != nil {
 		return result, err
 	}
 
 	if len(deployments.Items) < 1 {
-		return result, errors.New("No deployments associated with the service: " + instanceId)
+		return result, errors.New(fmt.Sprintf("Deployments associated with the service %s are not found", instanceId))
 	}
 
 	secrets, err := k.client.Secrets(api.NamespaceDefault).List(api.ListOptions{
@@ -630,20 +632,20 @@ func (k *K8Fabricator) GetAllPodsEnvsByInstanceId(instanceId string) ([]PodEnvs,
 		pod.Containers = []ContainerSimple{}
 
 		for _, container := range deployment.Spec.Template.Spec.Containers {
-			simpelContainer := ContainerSimple{}
-			simpelContainer.Name = container.Name
-			simpelContainer.Envs = map[string]string{}
+			simpleContainer := ContainerSimple{}
+			simpleContainer.Name = container.Name
+			simpleContainer.Envs = map[string]string{}
 
 			for _, env := range container.Env {
 				if env.Value == "" {
 					logger.Debug("Empty env value, searching env variable in secrets")
-					simpelContainer.Envs[env.Name] = findSecretValue(secrets, envNameToSecretKey(env.Name))
+					simpleContainer.Envs[env.Name] = findSecretValue(secrets, envNameToSecretKey(env.Name))
 				} else {
-					simpelContainer.Envs[env.Name] = env.Value
+					simpleContainer.Envs[env.Name] = env.Value
 				}
 
 			}
-			pod.Containers = append(pod.Containers, simpelContainer)
+			pod.Containers = append(pod.Containers, simpleContainer)
 		}
 		result = append(result, pod)
 	}
@@ -689,7 +691,7 @@ func getSelectorForManagedByLabel() (labels.Selector, error) {
 	return selector.Add(*managedByReq), nil
 }
 
-func getSelectorBySpecificJob(job extensions.Job) (labels.Selector, error) {
+func getSelectorBySpecificJob(job batch.Job) (labels.Selector, error) {
 	selector := labels.NewSelector()
 	for k, v := range job.Labels {
 		requirement, err := labels.NewRequirement(k, labels.EqualsOperator, sets.NewString(v))
