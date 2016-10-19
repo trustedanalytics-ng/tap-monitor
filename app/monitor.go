@@ -17,7 +17,9 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -35,13 +37,16 @@ import (
 var logger = logger_wrapper.InitLogger("app")
 var docker_hub_address = os.Getenv("IMAGE_FACTORY_HUB_ADDRESS")
 
-const CHECK_INTERVAL_SECONDS = 5
+const checkInternalSeconds = 5
+const imagesRepoUriPlaceHolder = "{{ repository_uri }}"
 
 // todo this is temporary -> DPNG-10694
 var createInstanceQueue = []string{}
 var deleteInstanceQueue = []string{}
 var pendingImageQueue = []string{}
 var readyImageQueue = []string{}
+
+var genericServiceTemplateID = os.Getenv("GENERIC_SERVICE_TEMPLATE_ID")
 
 type QueueManager struct {
 	*amqp.Channel
@@ -67,7 +72,7 @@ func StartMonitor(waitGroup *sync.WaitGroup) {
 		if err := queueManager.CheckCatalogRequestedImages(); err != nil {
 			logger.Error("Proccessing Catalog images error:", err)
 		}
-		time.Sleep(CHECK_INTERVAL_SECONDS * time.Second)
+		time.Sleep(checkInternalSeconds * time.Second)
 	}
 
 	defer queueManager.Connection.Close()
@@ -108,6 +113,7 @@ func (q *QueueManager) CheckCatalogRequestedImages() error {
 			}
 			pendingImageQueue = append(pendingImageQueue, image.Id)
 			q.sendMessageOnQueue(image, imageFactoryModels.IMAGE_FACTORY_QUEUE_NAME, imageFactoryModels.IMAGE_FACTORY_IMAGE_ROUTING_KEY)
+
 		case catalogModels.ImageStateReady:
 			if isInstanceIdInArray(readyImageQueue, image.Id) {
 				continue
@@ -115,39 +121,141 @@ func (q *QueueManager) CheckCatalogRequestedImages() error {
 			readyImageQueue = append(readyImageQueue, image.Id)
 
 			if catalogModels.IsApplicationInstance(image.Id) {
-				applicationId := catalogModels.GetApplicationId(image.Id)
-				instances, _, err := config.CatalogApi.ListApplicationInstances(applicationId)
+				err := ExecuteFlowForUserDefinedApp(image)
 				if err != nil {
-					logger.Error("Failed to call ListApplicationInstances for image: ", image.Id, err)
 					break
 				}
+			}
 
-				if len(instances) == 0 {
-					application, _, err := config.CatalogApi.GetApplication(applicationId)
-					if err != nil {
-						logger.Error("Failed to call GetApplication for image: ", image.Id, err)
-						break
-					}
-
-					instance := catalogModels.Instance{
-						Name:     application.Name,
-						Type:     catalogModels.InstanceTypeApplication,
-						ClassId:  application.Id,
-						Bindings: convertDependenciesToBindings(application.InstanceDependencies),
-						Metadata: []catalogModels.Metadata{
-							{Id: catalogModels.APPLICATION_IMAGE_ADDRESS, Value: getImageAddress(image.Id)},
-						},
-					}
-
-					if _, _, err = config.CatalogApi.AddApplicationInstance(application.Id, instance); err != nil {
-						logger.Error("Failed to call AddApplicationInstance for image: ", image.Id, err)
-						break
-					}
+			if catalogModels.IsUserDefinedOffering(image.Id) {
+				err = ExecuteFlowForUserDefinedOffering(image)
+				if err != nil {
+					break
 				}
 			}
 		}
 	}
 	return nil
+}
+
+func ExecuteFlowForUserDefinedApp(image catalogModels.Image) error {
+	applicationId := catalogModels.GetApplicationId(image.Id)
+	instances, _, err := config.CatalogApi.ListApplicationInstances(applicationId)
+	if err != nil {
+		logger.Errorf("Failed to get instances of application with id %s and image id %s", applicationId, image.Id)
+		return err
+	}
+
+	if len(instances) == 0 {
+		application, _, err := config.CatalogApi.GetApplication(applicationId)
+		if err != nil {
+			logger.Error("Failed to call GetApplication for image: ", image.Id, err)
+			return err
+		}
+
+		instance := catalogModels.Instance{
+			Name:     application.Name,
+			Type:     catalogModels.InstanceTypeApplication,
+			ClassId:  application.Id,
+			Bindings: convertDependenciesToBindings(application.InstanceDependencies),
+			Metadata: []catalogModels.Metadata{
+				{Id: catalogModels.APPLICATION_IMAGE_ADDRESS, Value: getImageAddress(image.Id)},
+			},
+		}
+
+		if _, _, err = config.CatalogApi.AddApplicationInstance(application.Id, instance); err != nil {
+			logger.Errorf("Failed to call AddApplicationInstance for image: %s - err: %v", image.Id, err)
+			return err
+		}
+	}
+	return nil
+}
+
+func ExecuteFlowForUserDefinedOffering(image catalogModels.Image) error {
+	newTemplate, _, err := config.TemplateRepositoryApi.GetTemplate(genericServiceTemplateID)
+	if err != nil {
+		logger.Errorf("cannot fetch generic template with id %s from Template Repository", genericServiceTemplateID)
+		return err
+	}
+
+	emptyTemplate := catalogModels.Template{}
+	emptyTemplate.State = catalogModels.TemplateStateInProgress
+	templateEntryFromCatalog, _, err := config.CatalogApi.AddTemplate(emptyTemplate)
+	if err != nil {
+		logger.Errorf("cannot create template entry to catalog - err: %v", err)
+		return err
+	}
+
+	newImageForTemplate := imagesRepoUriPlaceHolder + "/" + image.Id
+	newTemplate.Body.Deployments[0].Spec.Template.Spec.Containers[0].Image = newImageForTemplate
+	newTemplate.Id = templateEntryFromCatalog.Id
+
+	_, err = config.TemplateRepositoryApi.CreateTemplate(newTemplate)
+	if err != nil {
+		logger.Errorf("cannot create template with id %s in Template Repository", newTemplate.Id)
+		return err
+	}
+
+	_, _, err = UpdateTemplate(newTemplate.Id, "State", catalogModels.TemplateStateInProgress, catalogModels.TemplateStateReady)
+	if err != nil {
+		logger.Errorf("cannot update state of template with id %s", newTemplate.Id)
+		return err
+	}
+
+	offeringID := catalogModels.GetOfferingId(image.Id)
+
+	offering, _, err := config.CatalogApi.GetService(offeringID)
+	if err != nil {
+		logger.Errorf("cannot fetch service with id %s from Template Repository", offering.Id)
+		return err
+	}
+
+	offering, _, err = UpdateOffering(offeringID, "TemplateId", offering.TemplateId, newTemplate.Id)
+	if err != nil {
+		logger.Errorf("cannot update service with id %s with new templateId", offering.Id)
+		return err
+	}
+
+	offering, _, err = UpdateOffering(offeringID, "State", catalogModels.ServiceStateDeploying, catalogModels.ServiceStateReady)
+	if err != nil {
+		logger.Errorf("cannot update state of service with id %s", offering.Id)
+		return err
+	}
+	return nil
+}
+
+func UpdateTemplate(serviceId string, keyNameToUpdate string, oldVal interface{}, newVal interface{}) (catalogModels.Template, int, error) {
+	marshaledOldStateValue, err := json.Marshal(oldVal)
+	if err != nil {
+		logger.Errorf("cannot marshal value %s", oldVal)
+		return catalogModels.Template{}, http.StatusBadRequest, err
+	}
+
+	marshaledNewStateValue, err := json.Marshal(newVal)
+	if err != nil {
+		logger.Errorf("cannot marshal value %s", oldVal)
+		return catalogModels.Template{}, http.StatusBadRequest, err
+	}
+
+	patches := []catalogModels.Patch{{catalogModels.OperationUpdate, keyNameToUpdate, marshaledNewStateValue, marshaledOldStateValue}}
+	return config.CatalogApi.UpdateTemplate(serviceId, patches)
+}
+
+func UpdateOffering(serviceId string, keyNameToUpdate string, oldVal interface{}, newVal interface{}) (catalogModels.Service, int, error) {
+	marshaledOldStateValue, err := json.Marshal(oldVal)
+	if err != nil {
+		logger.Errorf("cannot marshal value %s", oldVal)
+		return catalogModels.Service{}, http.StatusBadRequest, err
+	}
+
+	marshaledNewStateValue, err := json.Marshal(newVal)
+	if err != nil {
+		logger.Errorf("cannot marshal value %s", oldVal)
+		return catalogModels.Service{}, http.StatusBadRequest, err
+	}
+
+	patches := []catalogModels.Patch{{catalogModels.OperationUpdate, keyNameToUpdate, marshaledNewStateValue, marshaledOldStateValue}}
+	return config.CatalogApi.UpdateService(serviceId, patches)
 }
 
 func getImageAddress(id string) string {

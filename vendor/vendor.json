@@ -15,14 +15,14 @@
 			"revisionTime": "2015-12-31T19:58:24Z"
 		},
 		{
-			"checksumSHA1": "qNkIUixj3jVNhiqKG/g6G+MbAJE=",
-			"path": "github.com/golang/mock/mockgen",
+			"checksumSHA1": "JSHl8b3nI8EWvzm+uyrIqj2Hiu4=",
+			"path": "github.com/golang/mock/gomock",
 			"revision": "bd3c8e81be01eef76d4b503f5e687d2d1354d2d9",
 			"revisionTime": "2016-01-21T18:51:14Z"
 		},
 		{
-			"checksumSHA1": "JSHl8b3nI8EWvzm+uyrIqj2Hiu4=",
-			"path": "github.com/golang/mock/gomock",
+			"checksumSHA1": "qNkIUixj3jVNhiqKG/g6G+MbAJE=",
+			"path": "github.com/golang/mock/mockgen",
 			"revision": "bd3c8e81be01eef76d4b503f5e687d2d1354d2d9",
 			"revisionTime": "2016-01-21T18:51:14Z"
 		},
@@ -143,14 +143,14 @@
 		{
 			"checksumSHA1": "3TnrKs4xAsp9UnNSfC2DqlEfMp4=",
 			"path": "github.com/trustedanalytics/tap-catalog/client",
-			"revision": "851017f3c6d6deede059c9bae5a6208b84cc94eb",
-			"revisionTime": "2016-10-10T06:35:25Z"
+			"revision": "7fb0ed3ab20783ada95802613c384f6bf7abe171",
+			"revisionTime": "2016-10-13T12:00:08Z"
 		},
 		{
-			"checksumSHA1": "iTyqcoqjdhNzFcVazs0NqQhI8u0=",
+			"checksumSHA1": "+XoK36hzJI+UxKpsshYR8AGKjTU=",
 			"path": "github.com/trustedanalytics/tap-catalog/models",
-			"revision": "851017f3c6d6deede059c9bae5a6208b84cc94eb",
-			"revisionTime": "2016-10-10T06:35:25Z"
+			"revision": "7fb0ed3ab20783ada95802613c384f6bf7abe171",
+			"revisionTime": "2016-10-13T12:00:08Z"
 		},
 		{
 			"checksumSHA1": "NLCJqrlNympA1L9AWZCZBVVGHxE=",

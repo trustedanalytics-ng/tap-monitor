@@ -22,22 +22,24 @@ import (
 
 	catalogApi "github.com/trustedanalytics/tap-catalog/client"
 	cephBrokerApi "github.com/trustedanalytics/tap-ceph-broker/client"
-	"github.com/trustedanalytics/tap-container-broker/k8s"
+	kubernetesApi "github.com/trustedanalytics/tap-container-broker/k8s"
 	"github.com/trustedanalytics/tap-go-common/util"
+	templateRepositoryApi "github.com/trustedanalytics/tap-template-repository/client"
 )
 
 type ConnectionConfig struct {
-	KubernetesApi k8s.KubernetesApi
-	CatalogApi    catalogApi.TapCatalogApi
+	KubernetesApi         kubernetesApi.KubernetesApi
+	CatalogApi            catalogApi.TapCatalogApi
+	TemplateRepositoryApi templateRepositoryApi.TemplateRepository
 }
 
 var config *ConnectionConfig
 
 var getAddressFromKubernetesEnvs = util.GetAddressFromKubernetesEnvs
 var getEnv = os.Getenv
-var newTapCatalogApiWithSSLAndBasicAuth = catalogApi.NewTapCatalogApiWithSSLAndBasicAuth
 var newTapCatalogApiWithBasicAuth = catalogApi.NewTapCatalogApiWithBasicAuth
-var getNewK8FabricatorInstance = k8s.GetNewK8FabricatorInstance
+var newK8FabricatorInstance = kubernetesApi.GetNewK8FabricatorInstance
+var newTapTemplateRepositoryWithBasicAuth = templateRepositoryApi.NewTemplateRepositoryBasicAuth
 
 func InitConnections() error {
 	catalogConnector, err := getCatalogConnector()
@@ -50,41 +52,36 @@ func InitConnections() error {
 		logger.Fatal("Can't connect with TAP-ceph-broker!", err)
 	}
 
-	kubernetesApiConnector, err := getNewK8FabricatorInstance(k8s.K8sClusterCredentials{
+	templateRepositoryConnector, err := getTemplateRepositoryConnector()
+	if err != nil {
+		logger.Fatal("Can't connect with TAP-NG-template-provider!", err)
+	}
+
+	kubernetesApiConnector, err := newK8FabricatorInstance(kubernetesApi.K8sClusterCredentials{
 		Server:   getEnv("K8S_API_ADDRESS"),
 		Username: getEnv("K8S_API_USERNAME"),
 		Password: getEnv("K8S_API_PASSWORD"),
 	}, cephBrokerConnector)
 
 	if err != nil {
-		return errors.New("Can't connect with K8S!" + err.Error())
+		return errors.New("cannot connect with K8S!" + err.Error())
 	}
 
 	config = &ConnectionConfig{}
 	config.CatalogApi = catalogConnector
 	config.KubernetesApi = kubernetesApiConnector
+	config.TemplateRepositoryApi = templateRepositoryConnector
 
 	return nil
 }
 
 func getCatalogConnector() (*catalogApi.TapCatalogApiConnector, error) {
 	address := getAddressFromKubernetesEnvs("CATALOG")
-	if getEnv("CATALOG_SSL_CERT_FILE_LOCATION") != "" {
-		return newTapCatalogApiWithSSLAndBasicAuth(
-			"https://"+address,
-			getEnv("CATALOG_USER"),
-			getEnv("CATALOG_PASS"),
-			getEnv("CATALOG_SSL_CERT_FILE_LOCATION"),
-			getEnv("CATALOG_SSL_KEY_FILE_LOCATION"),
-			getEnv("CATALOG_SSL_CA_FILE_LOCATION"),
-		)
-	} else {
-		return newTapCatalogApiWithBasicAuth(
-			"http://"+address,
-			getEnv("CATALOG_USER"),
-			getEnv("CATALOG_PASS"),
-		)
-	}
+	return newTapCatalogApiWithBasicAuth(
+		"http://"+address,
+		getEnv("CATALOG_USER"),
+		getEnv("CATALOG_PASS"),
+	)
 }
 
 func getCephBrokerConnector() (*cephBrokerApi.CephBrokerConnector, error) {
@@ -104,4 +101,13 @@ func getCephBrokerConnector() (*cephBrokerApi.CephBrokerConnector, error) {
 			os.Getenv("CEPH_BROKER_PASS"),
 		)
 	}
+}
+
+func getTemplateRepositoryConnector() (*templateRepositoryApi.TemplateRepositoryConnector, error) {
+	address := getAddressFromKubernetesEnvs("TEMPLATE_REPOSITORY")
+	return newTapTemplateRepositoryWithBasicAuth(
+		"http://"+address,
+		getEnv("TEMPLATE_REPOSITORY_USER"),
+		getEnv("TEMPLATE_REPOSITORY_PASS"),
+	)
 }
