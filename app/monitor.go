@@ -18,7 +18,6 @@ package app
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"sync"
@@ -58,27 +57,28 @@ func StartMonitor(waitGroup *sync.WaitGroup) {
 
 	channel, conn := setupQueueConnection()
 	queueManager := &QueueManager{channel, conn}
-
-	isRunning := true
-	go func() {
-		<-util.GetTerminationObserverChannel()
-		isRunning = false
-	}()
-
-	for isRunning {
-		if err := queueManager.CheckCatalogRequestedInstances(); err != nil {
-			logger.Error("Proccessing Catalog instances error:", err)
-		}
-		if err := queueManager.CheckCatalogRequestedImages(); err != nil {
-			logger.Error("Proccessing Catalog images error:", err)
-		}
-		time.Sleep(checkInternalSeconds * time.Second)
-	}
-
 	defer queueManager.Connection.Close()
 	defer queueManager.Channel.Close()
-	logger.Info("Monitoring stopped")
+
+	monitoringLoop(queueManager)
 	waitGroup.Done()
+}
+
+func monitoringLoop(queueManager *QueueManager) {
+	for {
+		select {
+		case <-time.After(checkInternalSeconds * time.Second):
+			if err := queueManager.CheckCatalogRequestedInstances(); err != nil {
+				logger.Error("Proccessing Catalog instances error:", err)
+			}
+			if err := queueManager.CheckCatalogRequestedImages(); err != nil {
+				logger.Error("Proccessing Catalog images error:", err)
+			}
+		case <-util.GetTerminationObserverChannel():
+			logger.Info("Monitoring stopped")
+			return
+		}
+	}
 }
 
 func setupQueueConnection() (*amqp.Channel, *amqp.Connection) {
@@ -111,8 +111,8 @@ func (q *QueueManager) CheckCatalogRequestedImages() error {
 			if isInstanceIdInArray(pendingImageQueue, image.Id) {
 				continue
 			}
+			q.sendToQueueImageFactoryBuild(image)
 			pendingImageQueue = append(pendingImageQueue, image.Id)
-			q.sendMessageOnQueue(image, imageFactoryModels.IMAGE_FACTORY_QUEUE_NAME, imageFactoryModels.IMAGE_FACTORY_IMAGE_ROUTING_KEY)
 
 		case catalogModels.ImageStateReady:
 			if isInstanceIdInArray(readyImageQueue, image.Id) {
@@ -273,51 +273,49 @@ func (q *QueueManager) CheckCatalogRequestedInstances() error {
 			if isInstanceIdInArray(createInstanceQueue, instance.Id) {
 				continue
 			}
-			q.sendMessageOnQueue(instance, containerBrokerModels.CONTAINER_BROKER_QUEUE_NAME, containerBrokerModels.CONTAINER_BROKER_CREATE_ROUTING_KEY)
+			q.sendToQueueBrokerCreate(instance)
 			createInstanceQueue = append(createInstanceQueue, instance.Id)
 		} else if instance.State == catalogModels.InstanceStateDestroyReq {
 			if isInstanceIdInArray(deleteInstanceQueue, instance.Id) {
 				continue
 			}
+			q.sendToQueueBrokerDelete(instance)
 			deleteInstanceQueue = append(deleteInstanceQueue, instance.Id)
-			q.sendMessageOnQueue(instance, containerBrokerModels.CONTAINER_BROKER_QUEUE_NAME, containerBrokerModels.CONTAINER_BROKER_DELETE_ROUTING_KEY)
 		}
 	}
 	return nil
 }
 
-func (q *QueueManager) sendMessageOnQueue(entity interface{}, queueName, routingKey string) {
-	var queueMessage []byte
-	var err error
+func (q *QueueManager) sendToQueueBrokerCreate(instance catalogModels.Instance) {
+	queueMessage, err := prepareCreateInstanceRequest(instance)
+	q.sendMessageOnQueue(queueMessage, err,
+		containerBrokerModels.CONTAINER_BROKER_QUEUE_NAME,
+		containerBrokerModels.CONTAINER_BROKER_CREATE_ROUTING_KEY,
+		"Failed to prepare CreateInstanceRequest for instance: ", instance.Id, err)
+}
 
-	switch routingKey {
-	case imageFactoryModels.IMAGE_FACTORY_IMAGE_ROUTING_KEY:
-		image, _ := entity.(catalogModels.Image)
-		queueMessage, err = prepareBuildImageRequest(image)
-		if err != nil {
-			logger.Error("Failed to prepare BuildImagePostRequest for image: ", image.Id, err)
-			break
-		}
+func (q *QueueManager) sendToQueueBrokerDelete(instance catalogModels.Instance) {
+	queueMessage, err := prepareDeleteInstanceRequest(instance)
+	q.sendMessageOnQueue(queueMessage, err,
+		containerBrokerModels.CONTAINER_BROKER_QUEUE_NAME,
+		containerBrokerModels.CONTAINER_BROKER_DELETE_ROUTING_KEY,
+		"Failed to prepare DeleteRequest for instance: ", instance.Id, err)
+}
 
-	case containerBrokerModels.CONTAINER_BROKER_CREATE_ROUTING_KEY:
-		instance, _ := entity.(catalogModels.Instance)
-		queueMessage, err = prepareCreateInstanceRequest(instance)
-		if err != nil {
-			logger.Error("Failed to prepare CreateInstanceRequest for instance: ", instance.Id, err)
-			return
-		}
-	case containerBrokerModels.CONTAINER_BROKER_DELETE_ROUTING_KEY:
-		instance, _ := entity.(catalogModels.Instance)
-		queueMessage, err = prepareDeleteInstanceRequest(instance)
-		if err != nil {
-			logger.Error("Failed to prepare DeleteRequest for instance: ", instance.Id, err)
-			return
-		}
-	default:
-		logger.Error(fmt.Sprintf("Following routing key is not supported: %s", routingKey))
+func (q *QueueManager) sendToQueueImageFactoryBuild(image catalogModels.Image) {
+	queueMessage, err := prepareBuildImageRequest(image)
+	q.sendMessageOnQueue(queueMessage, err,
+		imageFactoryModels.IMAGE_FACTORY_QUEUE_NAME,
+		imageFactoryModels.IMAGE_FACTORY_IMAGE_ROUTING_KEY,
+		"Failed to prepare BuildImagePostRequest for image: ", image.Id, err)
+}
+
+func (q *QueueManager) sendMessageOnQueue(queueMessage []byte, err error, queueName, routingKey string, errorMsg ...interface{}) {
+	if err != nil {
+		logger.Error(errorMsg...)
+		// TODO question about ImageFactory break statement
 		return
 	}
-
 	q.sendMessageAndReconnectIfError(queueMessage, queueName, routingKey)
 }
 
