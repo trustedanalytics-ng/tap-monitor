@@ -34,18 +34,17 @@ import (
 )
 
 var logger = logger_wrapper.InitLogger("app")
-var docker_hub_address = os.Getenv("IMAGE_FACTORY_HUB_ADDRESS")
+var dockerHubAddress = os.Getenv("IMAGE_FACTORY_HUB_ADDRESS")
+var genericServiceTemplateID = os.Getenv("GENERIC_SERVICE_TEMPLATE_ID")
+var imagesRepoUri = os.Getenv("DOCKER_IMAGE_REPOSITORY")
 
 const checkInternalSeconds = 5
-const imagesRepoUriPlaceHolder = "{{ repository_uri }}"
 
 // todo this is temporary -> DPNG-10694
 var createInstanceQueue = []string{}
 var deleteInstanceQueue = []string{}
 var pendingImageQueue = []string{}
 var readyImageQueue = []string{}
-
-var genericServiceTemplateID = os.Getenv("GENERIC_SERVICE_TEMPLATE_ID")
 
 type QueueManager struct {
 	*amqp.Channel
@@ -123,6 +122,7 @@ func (q *QueueManager) CheckCatalogRequestedImages() error {
 			if catalogModels.IsApplicationInstance(image.Id) {
 				err := ExecuteFlowForUserDefinedApp(image)
 				if err != nil {
+					logger.Errorf("Failed to create application instance - err: %v", err)
 					break
 				}
 			}
@@ -130,6 +130,7 @@ func (q *QueueManager) CheckCatalogRequestedImages() error {
 			if catalogModels.IsUserDefinedOffering(image.Id) {
 				err = ExecuteFlowForUserDefinedOffering(image)
 				if err != nil {
+					logger.Errorf("Failed to create offering from binary - err: %v", err)
 					break
 				}
 			}
@@ -172,6 +173,7 @@ func ExecuteFlowForUserDefinedApp(image catalogModels.Image) error {
 }
 
 func ExecuteFlowForUserDefinedOffering(image catalogModels.Image) error {
+	logger.Infof("started offering creation from image with id %s", image.Id)
 	newTemplate, _, err := config.TemplateRepositoryApi.GetTemplate(genericServiceTemplateID)
 	if err != nil {
 		logger.Errorf("cannot fetch generic template with id %s from Template Repository", genericServiceTemplateID)
@@ -186,7 +188,7 @@ func ExecuteFlowForUserDefinedOffering(image catalogModels.Image) error {
 		return err
 	}
 
-	newImageForTemplate := imagesRepoUriPlaceHolder + "/" + image.Id
+	newImageForTemplate := imagesRepoUri + "/" + image.Id
 	newTemplate.Body.Deployments[0].Spec.Template.Spec.Containers[0].Image = newImageForTemplate
 	newTemplate.Id = templateEntryFromCatalog.Id
 
@@ -206,21 +208,23 @@ func ExecuteFlowForUserDefinedOffering(image catalogModels.Image) error {
 
 	offering, _, err := config.CatalogApi.GetService(offeringID)
 	if err != nil {
-		logger.Errorf("cannot fetch service with id %s from Template Repository", offering.Id)
+		logger.Errorf("cannot fetch service with id %s from catalog", offeringID)
 		return err
 	}
 
 	offering, _, err = UpdateOffering(offeringID, "TemplateId", offering.TemplateId, newTemplate.Id)
 	if err != nil {
-		logger.Errorf("cannot update service with id %s with new templateId", offering.Id)
+		logger.Errorf("cannot update service with id %s with new templateId equal to: %s", offeringID, newTemplate.Id)
 		return err
 	}
 
 	offering, _, err = UpdateOffering(offeringID, "State", catalogModels.ServiceStateDeploying, catalogModels.ServiceStateReady)
 	if err != nil {
-		logger.Errorf("cannot update state of service with id %s", offering.Id)
+		logger.Errorf("cannot update state of service with id %s from DEPLOYING to READY", offeringID)
 		return err
 	}
+
+	logger.Infof("offering with id %s created successfully", offeringID)
 	return nil
 }
 
@@ -259,7 +263,7 @@ func UpdateOffering(serviceId string, keyNameToUpdate string, oldVal interface{}
 }
 
 func getImageAddress(id string) string {
-	return docker_hub_address + "/" + id
+	return dockerHubAddress + "/" + id
 }
 
 func (q *QueueManager) CheckCatalogRequestedInstances() error {
