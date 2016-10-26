@@ -19,13 +19,16 @@ const (
 	PLACEHOLDER_ORG   = "org"
 	PLACEHOLDER_SPACE = "space"
 
-	PLACEHOLDER_DOMAIN_NAME = "domain_name"
-	PLACEHOLDER_IMAGE       = "image"
-	PLACEHOLDER_HOSTNAME    = "hostname"
-	PLACEHOLDER_EXTRA_ENVS  = "extra_envs"
+	PLACEHOLDER_DOMAIN_NAME  = "domain_name"
+	PLACEHOLDER_IMAGE        = "image"
+	PLACEHOLDER_HOSTNAME     = "hostname"
+	PLACEHOLDER_EXTRA_ENVS   = "extra_envs"
+	PLACEHOLDER_MEMORY_LIMIT = "memory_limit"
 
-	PLACEHOLDER_INSTANCE_NAME             = "instance_name"
-	PLACEHOLDER_INSTANCE_ID               = "instance_id"
+	PLACEHOLDER_INSTANCE_NAME = "instance_name"
+	PLACEHOLDER_INSTANCE_ID   = "instance_id"
+
+	//TODO this is obsolete and will be removed soon -> DPNG-12250
 	PLACEHOLDER_IDX_AND_SHORT_INSTANCE_ID = "idx_and_short_instance_id"
 	PLACEHOLDER_SHORT_INSTANCE_ID         = "short_instance_id"
 	PLACEHOLDER_BOUND_INSTANCE_ID         = "bound_instance_id"
@@ -46,6 +49,8 @@ const (
 	PLACEHOLDER_CEPH_MONITORS    = "ceph_monitors"
 	PLACEHOLDER_CEPH_POOL        = "ceph_pool"
 	PLACEHOLDER_CEPH_FS_TYPE     = "ceph_fs_type"
+
+	PLACEHOLDER_CREATED_BY = "created_by"
 )
 
 func GetPlaceholderWithDollarPrefix(placeholder string) string {

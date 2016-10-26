@@ -14,25 +14,18 @@
  * limitations under the License.
  */
 
-package main
+package models
 
 import (
-	"sync"
-
-	commonLogger "github.com/trustedanalytics/tap-go-common/logger"
-	"github.com/trustedanalytics/tap-go-common/util"
-	"github.com/trustedanalytics/tap-monitor/app"
+	catalogModels "github.com/trustedanalytics/tap-catalog/models"
 )
 
-var logger, _ = commonLogger.InitLogger("main")
-var waitGroup = &sync.WaitGroup{}
-
-func main() {
-	go util.TerminationObserver(waitGroup, "Monitor")
-
-	if err := app.InitConnections(); err != nil {
-		logger.Fatal("ERROR initConnections: ", err.Error())
+var (
+	ImagesMap = map[catalogModels.ImageType]string{
+		"JAVA":      "tap-base-java:java8-jessie",
+		"GO":        "tap-base-binary:binary-jessie",
+		"NODEJS":    "tap-base-node:node4.4-jessie",
+		"PYTHON2.7": "tap-base-python:python2.7-jessie",
+		"PYTHON3.4": "tap-base-python:python3.4",
 	}
-
-	app.StartMonitor(waitGroup)
-}
+)

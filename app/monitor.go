@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,13 +28,14 @@ import (
 
 	catalogModels "github.com/trustedanalytics/tap-catalog/models"
 	containerBrokerModels "github.com/trustedanalytics/tap-container-broker/models"
-	"github.com/trustedanalytics/tap-go-common/logger"
+	commonLogger "github.com/trustedanalytics/tap-go-common/logger"
 	"github.com/trustedanalytics/tap-go-common/queue"
 	"github.com/trustedanalytics/tap-go-common/util"
 	imageFactoryModels "github.com/trustedanalytics/tap-image-factory/models"
+	templateRepositoryModels "github.com/trustedanalytics/tap-template-repository/model"
 )
 
-var logger = logger_wrapper.InitLogger("app")
+var logger, _ = commonLogger.InitLogger("app")
 var dockerHubAddress = os.Getenv("IMAGE_FACTORY_HUB_ADDRESS")
 var genericServiceTemplateID = os.Getenv("GENERIC_SERVICE_TEMPLATE_ID")
 var imagesRepoUri = os.Getenv("DOCKER_IMAGE_REPOSITORY")
@@ -174,7 +176,7 @@ func ExecuteFlowForUserDefinedApp(image catalogModels.Image) error {
 
 func ExecuteFlowForUserDefinedOffering(image catalogModels.Image) error {
 	logger.Infof("started offering creation from image with id %s", image.Id)
-	newTemplate, _, err := config.TemplateRepositoryApi.GetTemplate(genericServiceTemplateID)
+	newTemplate, _, err := config.TemplateRepositoryApi.GetRawTemplate(genericServiceTemplateID)
 	if err != nil {
 		logger.Errorf("cannot fetch generic template with id %s from Template Repository", genericServiceTemplateID)
 		return err
@@ -189,18 +191,23 @@ func ExecuteFlowForUserDefinedOffering(image catalogModels.Image) error {
 	}
 
 	newImageForTemplate := imagesRepoUri + "/" + image.Id
-	newTemplate.Body.Deployments[0].Spec.Template.Spec.Containers[0].Image = newImageForTemplate
-	newTemplate.Id = templateEntryFromCatalog.Id
+	templateID := templateEntryFromCatalog.Id
 
-	_, err = config.TemplateRepositoryApi.CreateTemplate(newTemplate)
+	newTemplate, err = adjustTemplateIdAndImage(templateID, newImageForTemplate, newTemplate)
 	if err != nil {
-		logger.Errorf("cannot create template with id %s in Template Repository", newTemplate.Id)
+		logger.Errorf("cannot adjust template id and image - template id:", templateID)
 		return err
 	}
 
-	_, _, err = UpdateTemplate(newTemplate.Id, "State", catalogModels.TemplateStateInProgress, catalogModels.TemplateStateReady)
+	_, err = config.TemplateRepositoryApi.CreateTemplate(newTemplate)
 	if err != nil {
-		logger.Errorf("cannot update state of template with id %s", newTemplate.Id)
+		logger.Errorf("cannot create template with id %s in Template Repository", templateID)
+		return err
+	}
+
+	_, _, err = UpdateTemplate(templateID, "State", catalogModels.TemplateStateInProgress, catalogModels.TemplateStateReady)
+	if err != nil {
+		logger.Errorf("cannot update state of template with id %s", templateID)
 		return err
 	}
 
@@ -212,9 +219,9 @@ func ExecuteFlowForUserDefinedOffering(image catalogModels.Image) error {
 		return err
 	}
 
-	offering, _, err = UpdateOffering(offeringID, "TemplateId", offering.TemplateId, newTemplate.Id)
+	offering, _, err = UpdateOffering(offeringID, "TemplateId", offering.TemplateId, templateID)
 	if err != nil {
-		logger.Errorf("cannot update service with id %s with new templateId equal to: %s", offeringID, newTemplate.Id)
+		logger.Errorf("cannot update service with id %s with new templateId equal to: %s", offeringID, templateID)
 		return err
 	}
 
@@ -226,6 +233,22 @@ func ExecuteFlowForUserDefinedOffering(image catalogModels.Image) error {
 
 	logger.Infof("offering with id %s created successfully", offeringID)
 	return nil
+}
+
+func adjustTemplateIdAndImage(templateID, image string, rawTemplate templateRepositoryModels.RawTemplate) (templateRepositoryModels.RawTemplate, error) {
+	rawTemplate[templateRepositoryModels.RAW_TEMPLATE_ID_FIELD] = templateID
+
+	rawTemplateBytes, err := json.Marshal(rawTemplate)
+	if err != nil {
+		return rawTemplate, err
+	}
+
+	adjustedRawTemplate := strings.Replace(string(rawTemplateBytes),
+		templateRepositoryModels.GetPlaceholderWithDollarPrefix(templateRepositoryModels.PLACEHOLDER_IMAGE), image, -1)
+
+	result := templateRepositoryModels.RawTemplate{}
+	err = json.Unmarshal([]byte(adjustedRawTemplate), &result)
+	return result, err
 }
 
 func UpdateTemplate(serviceId string, keyNameToUpdate string, oldVal interface{}, newVal interface{}) (catalogModels.Template, int, error) {

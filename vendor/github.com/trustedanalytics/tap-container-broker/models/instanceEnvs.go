@@ -14,25 +14,14 @@
  * limitations under the License.
  */
 
-package main
+package models
 
-import (
-	"sync"
+type DeploymentEnvs struct {
+	DeploymentName string
+	Containers     []ContainerEnvs
+}
 
-	commonLogger "github.com/trustedanalytics/tap-go-common/logger"
-	"github.com/trustedanalytics/tap-go-common/util"
-	"github.com/trustedanalytics/tap-monitor/app"
-)
-
-var logger, _ = commonLogger.InitLogger("main")
-var waitGroup = &sync.WaitGroup{}
-
-func main() {
-	go util.TerminationObserver(waitGroup, "Monitor")
-
-	if err := app.InitConnections(); err != nil {
-		logger.Fatal("ERROR initConnections: ", err.Error())
-	}
-
-	app.StartMonitor(waitGroup)
+type ContainerEnvs struct {
+	ContainerName string
+	Envs          map[string]string
 }

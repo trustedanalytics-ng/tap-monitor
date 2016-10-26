@@ -19,7 +19,6 @@ package k8s
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -31,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/trustedanalytics/tap-ceph-broker/client"
+	"github.com/trustedanalytics/tap-container-broker/models"
 	"github.com/trustedanalytics/tap-template-repository/model"
 )
 
@@ -43,7 +43,7 @@ type KubernetesApi interface {
 	DeleteAllByInstanceId(instanceId string) error
 	DeleteAllPersistentVolumeClaims() error
 	GetAllPersistentVolumes() ([]api.PersistentVolume, error)
-	GetAllPodsEnvsByInstanceId(instanceId string) ([]PodEnvs, error)
+	GetDeploymentsEnvsByInstanceId(instanceId string) ([]models.DeploymentEnvs, error)
 	GetService(instanceId string) ([]api.Service, error)
 	GetServices() ([]api.Service, error)
 	GetPodsStateByInstanceId(instanceId string) ([]PodStatus, error)
@@ -591,20 +591,16 @@ func (k *K8Fabricator) UpdateSecret(secret api.Secret) error {
 	return err
 }
 
-type PodEnvs struct {
-	DeploymentName string
-	Containers     []ContainerSimple
-}
-
-type ContainerSimple struct {
-	Name string
-	Envs map[string]string
-}
-
-func (k *K8Fabricator) GetAllPodsEnvsByInstanceId(instanceId string) ([]PodEnvs, error) {
-	result := []PodEnvs{}
+func (k *K8Fabricator) GetDeploymentsEnvsByInstanceId(instanceId string) ([]models.DeploymentEnvs, error) {
+	result := []models.DeploymentEnvs{}
 
 	selector, err := getSelectorForInstanceIdLabel(instanceId)
+	if err != nil {
+		return result, err
+	}
+
+	// this selector will be use to fetch all secrets/configMaps beacuse we need to find bound envs values
+	selectorAll, err := getSelectorForManagedByLabel()
 	if err != nil {
 		return result, err
 	}
@@ -619,53 +615,77 @@ func (k *K8Fabricator) GetAllPodsEnvsByInstanceId(instanceId string) ([]PodEnvs,
 	}
 
 	secrets, err := k.client.Secrets(api.NamespaceDefault).List(api.ListOptions{
-		LabelSelector: selector,
+		LabelSelector: selectorAll,
 	})
 	if err != nil {
 		logger.Error("List secrets failed:", err)
 		return result, err
 	}
 
+	configMaps, err := k.client.ConfigMaps(api.NamespaceDefault).List(api.ListOptions{
+		LabelSelector: selectorAll,
+	})
+	if err != nil {
+		logger.Error("List configMaps failed:", err)
+		return result, err
+	}
+
 	for _, deployment := range deployments.Items {
-		pod := PodEnvs{}
-		pod.DeploymentName = deployment.Name
-		pod.Containers = []ContainerSimple{}
+		deploymentEnvs := models.DeploymentEnvs{}
+		deploymentEnvs.DeploymentName = deployment.Name
+		deploymentEnvs.Containers = []models.ContainerEnvs{}
 
 		for _, container := range deployment.Spec.Template.Spec.Containers {
-			simpleContainer := ContainerSimple{}
-			simpleContainer.Name = container.Name
-			simpleContainer.Envs = map[string]string{}
+			containerEnvs := models.ContainerEnvs{}
+			containerEnvs.ContainerName = container.Name
+			containerEnvs.Envs = map[string]string{}
 
 			for _, env := range container.Env {
-				if env.Value == "" {
-					logger.Debug("Empty env value, searching env variable in secrets")
-					simpleContainer.Envs[env.Name] = findSecretValue(secrets, envNameToSecretKey(env.Name))
-				} else {
-					simpleContainer.Envs[env.Name] = env.Value
+				if env.Value != "" {
+					containerEnvs.Envs[env.Name] = env.Value
+				} else if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
+					containerEnvs.Envs[env.Name] = findSecretValue(secrets, env.ValueFrom.SecretKeyRef)
+				} else if env.ValueFrom != nil && env.ValueFrom.ConfigMapKeyRef != nil {
+					containerEnvs.Envs[env.Name] = findConfigMapValue(configMaps, env.ValueFrom.ConfigMapKeyRef)
 				}
 
 			}
-			pod.Containers = append(pod.Containers, simpleContainer)
+			deploymentEnvs.Containers = append(deploymentEnvs.Containers, containerEnvs)
 		}
-		result = append(result, pod)
+		result = append(result, deploymentEnvs)
 	}
 	return result, nil
 }
 
-func envNameToSecretKey(env_name string) string {
-	lower_case_string := strings.ToLower(env_name)
-	return strings.Replace(lower_case_string, "_", "-", -1)
-}
+func findSecretValue(secrets *api.SecretList, selector *api.SecretKeySelector) string {
+	for _, secret := range secrets.Items {
+		if secret.Name != selector.Name {
+			continue
+		}
 
-func findSecretValue(secrets *api.SecretList, secret_key string) string {
-	for _, i := range secrets.Items {
-		for key, value := range i.Data {
-			if key == secret_key {
+		for key, value := range secret.Data {
+			if key == selector.Key {
 				return string((value))
 			}
 		}
 	}
-	logger.Info("Secret key not found: ", secret_key)
+	logger.Warningf("Key %s not found in Secret", selector.Key)
+	return ""
+}
+
+func findConfigMapValue(configMaps *api.ConfigMapList, selector *api.ConfigMapKeySelector) string {
+	for _, configMap := range configMaps.Items {
+		if configMap.Name != selector.Name {
+			continue
+		}
+
+		for key, value := range configMap.Data {
+			if key == selector.Key {
+				return string(value)
+			}
+		}
+	}
+	logger.Warningf("Key %s not found in ConfigMap", selector.Key)
 	return ""
 }
 

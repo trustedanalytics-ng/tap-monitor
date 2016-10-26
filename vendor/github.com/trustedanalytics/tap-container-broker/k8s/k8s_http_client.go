@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 
 	brokerHttp "github.com/trustedanalytics/tap-go-common/http"
-	"github.com/trustedanalytics/tap-go-common/logger"
+	commonLogger "github.com/trustedanalytics/tap-go-common/logger"
 )
 
 // we need this redundant interface to be able to inject TestClient in Test class
@@ -69,7 +69,7 @@ type KubernetesTestCreator struct {
 	testExtensionClient *testclient.FakeExperimental
 }
 
-var logger = logger_wrapper.InitLogger("k8s")
+var logger, _ = commonLogger.InitLogger("k8s")
 
 type K8sClusterCredentials struct {
 	CLusterName    string `json:"cluster_name"`

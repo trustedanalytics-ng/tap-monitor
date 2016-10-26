@@ -21,7 +21,9 @@ import (
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
+
 	catalogModels "github.com/trustedanalytics/tap-catalog/models"
+	templateModels "github.com/trustedanalytics/tap-template-repository/model"
 )
 
 func TestConvertDependenciesToBindings(t *testing.T) {
@@ -41,5 +43,24 @@ func TestConvertDependenciesToBindings(t *testing.T) {
 				So(output, ShouldResemble, tc.output)
 			})
 		}
+	})
+}
+
+func TestAdjustTemplateIdAndImage(t *testing.T) {
+	Convey("Test adjustTemplateIdAndImage", t, func() {
+		templateId := "sameple-tempalte-id"
+		image := "sameple-image"
+		imageKey := "image"
+
+		rawTemplate := templateModels.RawTemplate{
+			imageKey: templateModels.GetPlaceholderWithDollarPrefix(templateModels.PLACEHOLDER_IMAGE),
+		}
+
+		Convey("For proper input should return proper response", func() {
+			adjustedRawTemplate, err := adjustTemplateIdAndImage(templateId, image, rawTemplate)
+			So(err, ShouldBeNil)
+			So(adjustedRawTemplate[templateModels.RAW_TEMPLATE_ID_FIELD], ShouldEqual, templateId)
+			So(adjustedRawTemplate[imageKey], ShouldEqual, image)
+		})
 	})
 }

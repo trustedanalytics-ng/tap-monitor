@@ -17,26 +17,26 @@
 package queue
 
 import (
-	"os"
 	"fmt"
+	"os"
 
 	"github.com/streadway/amqp"
 
-	"github.com/trustedanalytics/tap-go-common/logger"
 	"github.com/trustedanalytics/tap-go-common/util"
+	commonLogger "github.com/trustedanalytics/tap-go-common/logger"
 )
 
-var logger = logger_wrapper.InitLogger("queue")
+var logger, _ = commonLogger.InitLogger("queue")
 
 /*
 Remember to call defer on outputs:
 - defer conn
 - defer ch
- */
+*/
 func GetConnectionChannel() (*amqp.Channel, *amqp.Connection) {
 	conn, err := amqp.Dial(getQueueConnectionString())
 	if err != nil {
-		logger.Panic("Failed to connect to Queue on address" + getQueueConnectionString(), err)
+		logger.Panic("Failed to connect to Queue on address"+getQueueConnectionString(), err)
 	}
 
 	ch, err := conn.Channel()
@@ -60,12 +60,12 @@ func ConsumeMessages(ch *amqp.Channel, handler ConsumeHandlerFunc, queueName str
 
 	messageChannel, err := ch.Consume(
 		queueName, //queue
-		"", // consumer - empty means generate unique id
-		true, // auto-ack
-		false, // exclusive
-		false, // no-local
-		false, // no-wait
-		nil, // args
+		"",        // consumer - empty means generate unique id
+		true,      // auto-ack
+		false,     // exclusive
+		false,     // no-local
+		false,     // no-wait
+		nil,       // args
 	)
 	if err != nil {
 		logger.Fatalf("Failed to register consumer on queue:", queueName, err)
@@ -88,10 +88,10 @@ func ConsumeMessages(ch *amqp.Channel, handler ConsumeHandlerFunc, queueName str
 
 func SendMessageToQueue(ch *amqp.Channel, message []byte, queueName, routingKey string) error {
 	return ch.Publish(
-		queueName, // exchange
+		queueName,  // exchange
 		routingKey, // routing key
-		false, // mandatory
-		false, // immediate
+		false,      // mandatory
+		false,      // immediate
 		amqp.Publishing{
 			ContentType: "application/json",
 			Body:        message,
@@ -100,25 +100,25 @@ func SendMessageToQueue(ch *amqp.Channel, message []byte, queueName, routingKey 
 
 func CreateExchangeWithQueueByRoutingKeys(ch *amqp.Channel, name string, routingKeys []string) {
 	err := ch.ExchangeDeclare(
-		name, // name
+		name,     // name
 		"direct", // type
-		true, // durable
-		false, // auto-deleted
-		false, // internal
-		false, // no-wait
-		nil, // arguments
+		true,     // durable
+		false,    // auto-deleted
+		false,    // internal
+		false,    // no-wait
+		nil,      // arguments
 	)
 	if err != nil {
 		logger.Panic("Failed to declare an exchange", err)
 	}
 
 	q, err := ch.QueueDeclare(
-		name, // name
-		true, // durable
+		name,  // name
+		true,  // durable
 		false, // delete when usused
 		false, // exclusive
 		false, // no-wait
-		nil, // arguments
+		nil,   // arguments
 	)
 	if err != nil {
 		logger.Panic("Failed to declare a queue", err)
@@ -127,10 +127,10 @@ func CreateExchangeWithQueueByRoutingKeys(ch *amqp.Channel, name string, routing
 	for _, key := range routingKeys {
 		err = ch.QueueBind(
 			q.Name, // queue name
-			key, // routing key
-			name, // exchange
-			false, // no-wait
-			nil, // arguments
+			key,    // routing key
+			name,   // exchange
+			false,  // no-wait
+			nil,    // arguments
 		)
 		if err != nil {
 			logger.Panic("Failed to bind a queue", err)
