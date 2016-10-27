@@ -54,10 +54,5 @@ build_anywhere: prepare_dirs
 	cp ./$(APP_NAME) ./application/$(APP_NAME)
 	rm -Rf ./temp
 
-install_mockgen:
-	scripts/install_mockgen.sh
-
-mock_update: install_mockgen
-
-test: verify_gopath  mock_update
+test: verify_gopath
 	go test --cover $(APP_DIR_LIST)
