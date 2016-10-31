@@ -40,10 +40,12 @@ const (
 
 type KubernetesApi interface {
 	FabricateService(instanceId string, parameters map[string]string, component *model.KubernetesComponent) error
+	GetFabricatedServicesForAllOrgs() ([]*model.KubernetesComponent, error)
+	GetFabricatedServices(organization string) ([]*model.KubernetesComponent, error)
 	DeleteAllByInstanceId(instanceId string) error
 	DeleteAllPersistentVolumeClaims() error
 	GetAllPersistentVolumes() ([]api.PersistentVolume, error)
-	GetDeploymentsEnvsByInstanceId(instanceId string) ([]models.DeploymentEnvs, error)
+	GetDeploymentsEnvsByInstanceId(instanceId string) ([]models.ContainerCredenials, error)
 	GetService(instanceId string) ([]api.Service, error)
 	GetServices() ([]api.Service, error)
 	GetPodsStateByInstanceId(instanceId string) ([]PodStatus, error)
@@ -123,6 +125,18 @@ func (k *K8Fabricator) FabricateService(instanceId string, parameters map[string
 		}
 	}
 
+	for _, svc := range component.Services {
+		if _, err := k.client.Services(api.NamespaceDefault).Create(svc); err != nil {
+			return err
+		}
+	}
+
+	for _, acc := range component.ServiceAccounts {
+		if _, err := k.client.ServiceAccounts(api.NamespaceDefault).Create(acc); err != nil {
+			return err
+		}
+	}
+
 	for _, deployment := range component.Deployments {
 		for i, container := range deployment.Spec.Template.Spec.Containers {
 			deployment.Spec.Template.Spec.Containers[i].Env = append(container.Env, extraEnvironments...)
@@ -137,24 +151,125 @@ func (k *K8Fabricator) FabricateService(instanceId string, parameters map[string
 		}
 	}
 
-	for _, svc := range component.Services {
-		if _, err := k.client.Services(api.NamespaceDefault).Create(svc); err != nil {
-			return err
-		}
-	}
-
 	for _, ing := range component.Ingresses {
 		if _, err := k.extensionsClient.Ingress(api.NamespaceDefault).Create(ing); err != nil {
 			return err
 		}
 	}
 
-	for _, acc := range component.ServiceAccounts {
-		if _, err := k.client.ServiceAccounts(api.NamespaceDefault).Create(acc); err != nil {
-			return err
-		}
-	}
 	return nil
+}
+
+func (k *K8Fabricator) GetFabricatedServicesForAllOrgs() ([]*model.KubernetesComponent, error) {
+	// TODO: iterate over all organizations here
+	return k.GetFabricatedServices(api.NamespaceDefault)
+}
+
+func (k *K8Fabricator) GetFabricatedServices(organization string) ([]*model.KubernetesComponent, error) {
+	selector, err := getSelectorForManagedByLabel()
+	if err != nil {
+		return nil, err
+	}
+	listOptions := api.ListOptions{
+		LabelSelector: selector,
+	}
+
+	pvcs, err := k.client.PersistentVolumeClaims(organization).List(listOptions)
+	if err != nil {
+		return nil, err
+	}
+	deployments, err := k.extensionsClient.Deployments(organization).List(listOptions)
+	if err != nil {
+		return nil, err
+	}
+	ings, err := k.extensionsClient.Ingress(organization).List(listOptions)
+	if err != nil {
+		return nil, err
+	}
+	svcs, err := k.client.Services(organization).List(listOptions)
+	if err != nil {
+		return nil, err
+	}
+	sAccounts, err := k.client.ServiceAccounts(organization).List(listOptions)
+	if err != nil {
+		return nil, err
+	}
+	secrets, err := k.client.Secrets(organization).List(listOptions)
+	if err != nil {
+		return nil, err
+	}
+	return groupIntoComponents(
+		pvcs.Items,
+		deployments.Items,
+		ings.Items,
+		svcs.Items,
+		sAccounts.Items,
+		secrets.Items), nil
+}
+
+func groupIntoComponents(
+	pvcs []api.PersistentVolumeClaim,
+	deployments []extensions.Deployment,
+	ings []extensions.Ingress,
+	svcs []api.Service,
+	sAccounts []api.ServiceAccount,
+	secrets []api.Secret,
+) []*model.KubernetesComponent {
+
+	components := make(map[string]*model.KubernetesComponent)
+
+	for _, pvc := range pvcs {
+		id := pvc.Labels[InstanceIdLabel]
+		component := ensureAndGetKubernetesComponent(components, id)
+		component.PersistentVolumeClaims = append(component.PersistentVolumeClaims, &pvc)
+	}
+
+	for _, deployment := range deployments {
+		id := deployment.Labels[InstanceIdLabel]
+		component := ensureAndGetKubernetesComponent(components, id)
+		component.Deployments = append(component.Deployments, &deployment)
+	}
+
+	for _, ing := range ings {
+		id := ing.Labels[InstanceIdLabel]
+		component := ensureAndGetKubernetesComponent(components, id)
+		component.Ingresses = append(component.Ingresses, &ing)
+	}
+
+	for _, svc := range svcs {
+		id := svc.Labels[InstanceIdLabel]
+		component := ensureAndGetKubernetesComponent(components, id)
+		component.Services = append(component.Services, &svc)
+	}
+
+	for _, account := range sAccounts {
+		id := account.Labels[InstanceIdLabel]
+		component := ensureAndGetKubernetesComponent(components, id)
+		component.ServiceAccounts = append(component.ServiceAccounts, &account)
+	}
+
+	for _, secret := range secrets {
+		id := secret.Labels[InstanceIdLabel]
+		component := ensureAndGetKubernetesComponent(components, id)
+		component.Secrets = append(component.Secrets, &secret)
+	}
+
+	var list []*model.KubernetesComponent
+	for _, component := range components {
+		list = append(list, component)
+	}
+	return list
+}
+
+func ensureAndGetKubernetesComponent(components map[string]*model.KubernetesComponent,
+	id string) *model.KubernetesComponent {
+
+	component, found := components[id]
+	if !found {
+		component := &model.KubernetesComponent{}
+		components[id] = component
+	}
+	return component
 }
 
 func (k *K8Fabricator) ScaleDeploymentAndWait(deployment *extensions.Deployment, replicas int) error {
@@ -591,8 +706,8 @@ func (k *K8Fabricator) UpdateSecret(secret api.Secret) error {
 	return err
 }
 
-func (k *K8Fabricator) GetDeploymentsEnvsByInstanceId(instanceId string) ([]models.DeploymentEnvs, error) {
-	result := []models.DeploymentEnvs{}
+func (k *K8Fabricator) GetDeploymentsEnvsByInstanceId(instanceId string) ([]models.ContainerCredenials, error) {
+	result := []models.ContainerCredenials{}
 
 	selector, err := getSelectorForInstanceIdLabel(instanceId)
 	if err != nil {
@@ -631,14 +746,10 @@ func (k *K8Fabricator) GetDeploymentsEnvsByInstanceId(instanceId string) ([]mode
 	}
 
 	for _, deployment := range deployments.Items {
-		deploymentEnvs := models.DeploymentEnvs{}
-		deploymentEnvs.DeploymentName = deployment.Name
-		deploymentEnvs.Containers = []models.ContainerEnvs{}
-
 		for _, container := range deployment.Spec.Template.Spec.Containers {
-			containerEnvs := models.ContainerEnvs{}
-			containerEnvs.ContainerName = container.Name
-			containerEnvs.Envs = map[string]string{}
+			containerEnvs := models.ContainerCredenials{}
+			containerEnvs.Name = deployment.Name + "_" + container.Name
+			containerEnvs.Envs = make(map[string]interface{})
 
 			for _, env := range container.Env {
 				if env.Value != "" {
@@ -648,11 +759,9 @@ func (k *K8Fabricator) GetDeploymentsEnvsByInstanceId(instanceId string) ([]mode
 				} else if env.ValueFrom != nil && env.ValueFrom.ConfigMapKeyRef != nil {
 					containerEnvs.Envs[env.Name] = findConfigMapValue(configMaps, env.ValueFrom.ConfigMapKeyRef)
 				}
-
 			}
-			deploymentEnvs.Containers = append(deploymentEnvs.Containers, containerEnvs)
+			result = append(result, containerEnvs)
 		}
-		result = append(result, deploymentEnvs)
 	}
 	return result, nil
 }

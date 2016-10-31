@@ -165,10 +165,10 @@
 			"revisionTime": "2016-10-07T12:31:08Z"
 		},
 		{
-			"checksumSHA1": "hOzhEE7ScDrRuB3hlXhljq5KNpU=",
+			"checksumSHA1": "t9CWOGfVfk29f0ejAAgZd8Mw0NE=",
 			"path": "github.com/trustedanalytics/tap-container-broker/k8s",
-			"revision": "2a970d197e98e784a816acd49cff0bb529fc60f8",
-			"revisionTime": "2016-10-21T10:39:23Z"
+			"revision": "295a702459c061871bc0de7279d3eb3e54de23b8",
+			"revisionTime": "2016-10-31T10:53:10Z"
 		},
 		{
 			"checksumSHA1": "H7iyIOkdduJqsOsz1QWBw8SpYaE=",
