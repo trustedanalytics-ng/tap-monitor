@@ -95,7 +95,6 @@ func convertDependenciesToBindings(dependencies []catalogModels.InstanceDependen
 	for i, dependency := range dependencies {
 		result[i].Id = dependency.Id
 	}
-
 	return result
 }
 
@@ -164,6 +163,10 @@ func ExecuteFlowForUserDefinedApp(image catalogModels.Image) error {
 			Metadata: []catalogModels.Metadata{
 				{Id: catalogModels.APPLICATION_IMAGE_ADDRESS, Value: getImageAddress(image.Id)},
 			},
+			AuditTrail: catalogModels.AuditTrail{
+				LastUpdateBy: application.AuditTrail.LastUpdateBy,
+				CreatedBy:    application.AuditTrail.CreatedBy,
+			},
 		}
 
 		if _, _, err = config.CatalogApi.AddApplicationInstance(application.Id, instance); err != nil {
@@ -182,7 +185,12 @@ func ExecuteFlowForUserDefinedOffering(image catalogModels.Image) error {
 		return err
 	}
 
-	emptyTemplate := catalogModels.Template{}
+	emptyTemplate := catalogModels.Template{
+		AuditTrail: catalogModels.AuditTrail{
+			LastUpdateBy: image.AuditTrail.LastUpdateBy,
+			CreatedBy:    image.AuditTrail.CreatedBy,
+		},
+	}
 	emptyTemplate.State = catalogModels.TemplateStateInProgress
 	templateEntryFromCatalog, _, err := config.CatalogApi.AddTemplate(emptyTemplate)
 	if err != nil {
@@ -264,7 +272,12 @@ func UpdateTemplate(serviceId string, keyNameToUpdate string, oldVal interface{}
 		return catalogModels.Template{}, http.StatusBadRequest, err
 	}
 
-	patches := []catalogModels.Patch{{catalogModels.OperationUpdate, keyNameToUpdate, marshaledNewStateValue, marshaledOldStateValue}}
+	patches := []catalogModels.Patch{{
+		Operation: catalogModels.OperationUpdate,
+		Field:     keyNameToUpdate,
+		Value:     marshaledNewStateValue,
+		PrevValue: marshaledOldStateValue,
+	}}
 	return config.CatalogApi.UpdateTemplate(serviceId, patches)
 }
 
@@ -281,7 +294,12 @@ func UpdateOffering(serviceId string, keyNameToUpdate string, oldVal interface{}
 		return catalogModels.Service{}, http.StatusBadRequest, err
 	}
 
-	patches := []catalogModels.Patch{{catalogModels.OperationUpdate, keyNameToUpdate, marshaledNewStateValue, marshaledOldStateValue}}
+	patches := []catalogModels.Patch{{
+		Operation: catalogModels.OperationUpdate,
+		Field:     keyNameToUpdate,
+		Value:     marshaledNewStateValue,
+		PrevValue: marshaledOldStateValue,
+	}}
 	return config.CatalogApi.UpdateService(serviceId, patches)
 }
 

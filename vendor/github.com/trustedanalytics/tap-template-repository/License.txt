@@ -13,10 +13,3 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package models
-
-type ContainerCredenials struct {
-	Name string                 `json:"name"`
-	Envs map[string]interface{} `json:"envs"`
-}
