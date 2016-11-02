@@ -266,7 +266,7 @@ func ensureAndGetKubernetesComponent(components map[string]*model.KubernetesComp
 
 	component, found := components[id]
 	if !found {
-		component := &model.KubernetesComponent{}
+		component = &model.KubernetesComponent{}
 		components[id] = component
 	}
 	return component
