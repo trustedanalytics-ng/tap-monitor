@@ -35,7 +35,7 @@ type ConnectionConfig struct {
 
 var config *ConnectionConfig
 
-var getAddressFromKubernetesEnvs = util.GetAddressFromKubernetesEnvs
+var getConnectionParametersFromEnv = util.GetConnectionParametersFromEnv
 var getEnv = os.Getenv
 var newTapCatalogApiWithBasicAuth = catalogApi.NewTapCatalogApiWithBasicAuth
 var newK8FabricatorInstance = kubernetesApi.GetNewK8FabricatorInstance
@@ -76,38 +76,25 @@ func InitConnections() error {
 }
 
 func getCatalogConnector() (*catalogApi.TapCatalogApiConnector, error) {
-	address := getAddressFromKubernetesEnvs("CATALOG")
-	return newTapCatalogApiWithBasicAuth(
-		"http://"+address,
-		getEnv("CATALOG_USER"),
-		getEnv("CATALOG_PASS"),
-	)
+	address, username, password, err := getConnectionParametersFromEnv("CATALOG")
+	if err != nil {
+		panic(err.Error())
+	}
+	return newTapCatalogApiWithBasicAuth("https://"+address, username, password)
 }
 
 func getCephBrokerConnector() (*cephBrokerApi.CephBrokerConnector, error) {
-	if os.Getenv("CEPH_BROKER_SSL_CERT_FILE_LOCATION") != "" {
-		return cephBrokerApi.NewCephBrokerCa(
-			"https://"+os.Getenv("CEPH_BROKER_ADDRESS"),
-			os.Getenv("CEPH_BROKER_USER"),
-			os.Getenv("CEPH_BROKER_PASS"),
-			os.Getenv("CEPH_BROKER_SSL_CERT_FILE_LOCATION"),
-			os.Getenv("CEPH_BROKER_SSL_KEY_FILE_LOCATION"),
-			os.Getenv("CEPH_BROKER_SSL_CA_FILE_LOCATION"),
-		)
-	} else {
-		return cephBrokerApi.NewCephBrokerBasicAuth(
-			"http://"+os.Getenv("CEPH_BROKER_ADDRESS"),
-			os.Getenv("CEPH_BROKER_USER"),
-			os.Getenv("CEPH_BROKER_PASS"),
-		)
+	address, username, password, err := getConnectionParametersFromEnv("CEPH_BROKER")
+	if err != nil {
+		panic(err.Error())
 	}
+	return cephBrokerApi.NewCephBrokerBasicAuth("http://"+address, username, password)
 }
 
 func getTemplateRepositoryConnector() (*templateRepositoryApi.TemplateRepositoryConnector, error) {
-	address := getAddressFromKubernetesEnvs("TEMPLATE_REPOSITORY")
-	return newTapTemplateRepositoryWithBasicAuth(
-		"http://"+address,
-		getEnv("TEMPLATE_REPOSITORY_USER"),
-		getEnv("TEMPLATE_REPOSITORY_PASS"),
-	)
+	address, username, password, err := getConnectionParametersFromEnv("TEMPLATE_REPOSITORY")
+	if err != nil {
+		panic(err.Error())
+	}
+	return newTapTemplateRepositoryWithBasicAuth("https://"+address, username, password)
 }

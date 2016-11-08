@@ -18,6 +18,7 @@ package app
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -31,24 +32,39 @@ import (
 )
 
 const (
-	CatalogUser                = "sample_user"
-	CatalogPassword            = "sample_password"
-	TemplateRepositoryUser     = "sample_user"
-	TemplateRepositoryPassword = "sample_password"
-	AddressFromKubernetes      = "someaddress.com"
-	K8SAPIAddress              = "k8s.someaddress.com"
-	K8SAPIUser                 = "k8s username"
-	K8SAPIPassword             = "k8s password"
+	catalogUser                = "sample_user"
+	catalogPassword            = "sample_password"
+	catalogHost                = "catalog.internal"
+	catalogPort                = "443"
+	templateRepositoryHost     = "template-repository.internal"
+	templateRepositoryPort     = "443"
+	templateRepositoryUser     = "sample_user"
+	templateRepositoryPassword = "sample_password"
+	k8sAPIAddress              = "k8s.someaddress.com"
+	k8sAPIUser                 = "k8s-username"
+	k8sAPIPassword             = "k8s-password"
+	cephBrokerHost             = "ceph-broker.internal"
+	cephBrokerPort             = "80"
+	cephBrokerUser             = "sample_ceph_broker_user"
+	cephBrokerPass             = "sample_ceph_broker_pass"
 )
 
 var basicEnvs = map[string]string{
-	"CATALOG_USER":             CatalogUser,
-	"CATALOG_PASS":             CatalogPassword,
-	"TEMPLATE_REPOSITORY_USER": TemplateRepositoryUser,
-	"TEMPLATE_REPOSITORY_PASS": TemplateRepositoryPassword,
-	"K8S_API_ADDRESS":          K8SAPIAddress,
-	"K8S_API_USERNAME":         K8SAPIUser,
-	"K8S_API_PASSWORD":         K8SAPIPassword,
+	"CATALOG_HOST":             catalogHost,
+	"CATALOG_PORT":             catalogPort,
+	"CATALOG_USER":             catalogUser,
+	"CATALOG_PASS":             catalogPassword,
+	"TEMPLATE_REPOSITORY_HOST": templateRepositoryHost,
+	"TEMPLATE_REPOSITORY_PORT": templateRepositoryPort,
+	"TEMPLATE_REPOSITORY_USER": templateRepositoryUser,
+	"TEMPLATE_REPOSITORY_PASS": templateRepositoryPassword,
+	"K8S_API_ADDRESS":          k8sAPIAddress,
+	"K8S_API_USERNAME":         k8sAPIUser,
+	"K8S_API_PASSWORD":         k8sAPIPassword,
+	"CEPH_BROKER_HOST":         cephBrokerHost,
+	"CEPH_BROKER_PORT":         cephBrokerPort,
+	"CEPH_BROKER_USER":         cephBrokerUser,
+	"CEPH_BROKER_PASS":         cephBrokerPass,
 }
 
 var localEnvs map[string]string
@@ -60,8 +76,17 @@ func fakeGetEnv(key string) string {
 	return ""
 }
 
-func fakeGetAddressFromKubernetesEnvs(key string) string {
-	return AddressFromKubernetes
+func fakeGetConnectionParametersFromEnv(componentName string) (string, string, string, error) {
+	host := getEnv(componentName + "_HOST")
+	port := getEnv(componentName + "_PORT")
+	user := getEnv(componentName + "_USER")
+	pass := getEnv(componentName + "_PASS")
+
+	if user == "" || pass == "" || host == "" || port == "" {
+		return fmt.Sprintf("%s:%s", host, port), user, pass, errors.New("undefined vars")
+	}
+
+	return fmt.Sprintf("%s:%s", host, port), user, pass, nil
 }
 
 func fakeNewTapCatalogAPIWithBasicAuth(address, username, password string) (*catalogApi.TapCatalogApiConnector, error) {
@@ -82,7 +107,7 @@ func fakeNewTapTemplateRepositoryAPIWithBasicAuth(address, username, password st
 
 func prepareTestingEnvironment(t *testing.T) {
 	getEnv = fakeGetEnv
-	getAddressFromKubernetesEnvs = fakeGetAddressFromKubernetesEnvs
+	getConnectionParametersFromEnv = fakeGetConnectionParametersFromEnv
 
 	localEnvs = make(map[string]string)
 	for k, v := range basicEnvs {
@@ -100,53 +125,50 @@ func prepareTestingEnvironment(t *testing.T) {
 }
 
 func TestGetCatalogConnector(t *testing.T) {
-	Convey("When there is no SSL ceritifiate", t, func() {
-		prepareTestingEnvironment(t)
+	prepareTestingEnvironment(t)
 
-		Convey("getCatalogConnector should return proper response", func() {
-			connector, err := getCatalogConnector()
+	Convey("getCatalogConnector should return proper response", t, func() {
+		connector, err := getCatalogConnector()
 
-			Convey("Error should be nil", func() {
-				So(err, ShouldBeNil)
-			})
-			Convey("Address should be proper", func() {
-				So(connector.Address, ShouldEqual, "http://"+AddressFromKubernetes)
-			})
-			Convey("Catalog should be proper", func() {
-				So(connector.Username, ShouldEqual, CatalogUser)
-			})
-			Convey("Password should be proper", func() {
-				So(connector.Password, ShouldEqual, CatalogPassword)
-			})
-			Convey("Client should not be nil", func() {
-				So(connector.Client, ShouldNotBeNil)
-			})
+		Convey("Error should be nil", func() {
+			So(err, ShouldBeNil)
+		})
+		Convey("Address should be proper", func() {
+			So(connector.Address, ShouldEqual, fmt.Sprintf("https://%s:%s", catalogHost, catalogPort))
+		})
+		Convey("Catalog should be proper", func() {
+			So(connector.Username, ShouldEqual, catalogUser)
+		})
+		Convey("Password should be proper", func() {
+			So(connector.Password, ShouldEqual, catalogPassword)
+		})
+		Convey("Client should not be nil", func() {
+			So(connector.Client, ShouldNotBeNil)
 		})
 	})
 }
 
 func TestGetTemplateRepositoryConnector(t *testing.T) {
-	Convey("When there is no SSL ceritifiate", t, func() {
-		prepareTestingEnvironment(t)
+	prepareTestingEnvironment(t)
 
-		Convey("getTemplateRepositoryConnector should return proper response", func() {
-			connector, err := getTemplateRepositoryConnector()
+	Convey("getTemplateRepositoryConnector should return proper response", t, func() {
+		connector, err := getTemplateRepositoryConnector()
 
-			Convey("Error should be nil", func() {
-				So(err, ShouldBeNil)
-			})
-			Convey("Address should be proper", func() {
-				So(connector.Address, ShouldEqual, "http://"+AddressFromKubernetes)
-			})
-			Convey("User should be proper", func() {
-				So(connector.Username, ShouldEqual, TemplateRepositoryUser)
-			})
-			Convey("Password should be proper", func() {
-				So(connector.Password, ShouldEqual, TemplateRepositoryPassword)
-			})
-			Convey("Client should not be nil", func() {
-				So(connector.Client, ShouldNotBeNil)
-			})
+		Convey("Error should be nil", func() {
+			So(err, ShouldBeNil)
+		})
+		Convey("Address should be proper", func() {
+			So(connector.Address, ShouldEqual, fmt.Sprintf("https://%s:%s", templateRepositoryHost,
+				templateRepositoryPort))
+		})
+		Convey("User should be proper", func() {
+			So(connector.Username, ShouldEqual, templateRepositoryUser)
+		})
+		Convey("Password should be proper", func() {
+			So(connector.Password, ShouldEqual, templateRepositoryPassword)
+		})
+		Convey("Client should not be nil", func() {
+			So(connector.Client, ShouldNotBeNil)
 		})
 	})
 }
@@ -177,7 +199,6 @@ func TestInitConnection(t *testing.T) {
 				})
 			})
 		})
-
 		Convey("When getNewK8FabricatorInstance fails", func() {
 			newK8FabricatorInstance = fakeGetNewK8FabricatorInstanceFailing
 
