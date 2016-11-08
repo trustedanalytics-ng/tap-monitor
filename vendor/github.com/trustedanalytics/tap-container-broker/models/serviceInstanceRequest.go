@@ -34,3 +34,9 @@ type BindRequest struct {
 	SrcId string `json:"src_id"`
 	DstId string `json:"dst_id"`
 }
+
+type ExposeRequest struct {
+	Ports    []int32 `json:"ports"`
+	Hostname string  `json:"hostname"`
+	Ip       string  `json:"ip"`
+}

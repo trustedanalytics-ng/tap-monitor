@@ -19,6 +19,7 @@ package k8s
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -36,6 +37,14 @@ import (
 
 const (
 	NotFound string = "not found"
+
+	InstanceIdLabel string = "instance_id"
+	managedByLabel  string = "managed_by"
+	managedByValue  string = "TAP"
+
+	jobName string = "job-name"
+
+	defaultCephImageSizeMB = 200
 )
 
 type KubernetesApi interface {
@@ -46,16 +55,24 @@ type KubernetesApi interface {
 	DeleteAllPersistentVolumeClaims() error
 	GetAllPersistentVolumes() ([]api.PersistentVolume, error)
 	GetDeploymentsEnvsByInstanceId(instanceId string) ([]models.ContainerCredenials, error)
-	GetService(instanceId string) ([]api.Service, error)
+	GetService(name string) (*api.Service, error)
+	CreateService(service api.Service) error
+	DeleteService(name string) error
+	GetServiceByInstanceId(instanceId string) ([]api.Service, error)
 	GetServices() ([]api.Service, error)
-	GetPodsStateByInstanceId(instanceId string) ([]PodStatus, error)
-	GetPodsStateForAllServices() (map[string][]PodStatus, error)
+	GetEndpoint(name string) (*api.Endpoints, error)
+	CreateEndpoint(endpoint api.Endpoints) error
+	DeleteEndpoint(name string) error
+	GetPodsByInstanceId(instanceId string) ([]api.Pod, error)
 	ListDeployments() (*extensions.DeploymentList, error)
 	CreateConfigMap(configMap *api.ConfigMap) error
 	GetConfigMap(name string) (*api.ConfigMap, error)
 	GetSecret(name string) (*api.Secret, error)
 	CreateSecret(secret api.Secret) error
 	DeleteSecret(name string) error
+	GetIngress(name string) (*extensions.Ingress, error)
+	CreateIngress(ingress extensions.Ingress) error
+	DeleteIngress(name string) error
 	UpdateSecret(secret api.Secret) error
 	GetJobs() (*batch.JobList, error)
 	GetJobsByInstanceId(instanceId string) (*batch.JobList, error)
@@ -71,6 +88,7 @@ type KubernetesApi interface {
 	UpdateDeployment(deployment *extensions.Deployment) (*extensions.Deployment, error)
 	GetDeployment(name string) (*extensions.Deployment, error)
 	GetIngressHosts(instanceId string) ([]string, error)
+	GetPodEvents(pod api.Pod) ([]api.Event, error)
 }
 
 type K8Fabricator struct {
@@ -96,11 +114,6 @@ func GetNewK8FabricatorInstance(creds K8sClusterCredentials, cephClient client.C
 	result.cephClient = cephClient
 	return &result, err
 }
-
-const InstanceIdLabel string = "instance_id"
-const managedByLabel string = "managed_by"
-const jobName string = "job-name"
-const defaultCephImageSizeMB = 200
 
 func (k *K8Fabricator) FabricateService(instanceId string, parameters map[string]string, component *model.KubernetesComponent) error {
 	extraEnvironments := []api.EnvVar{{Name: "TAP_K8S", Value: "true"}}
@@ -219,38 +232,32 @@ func groupIntoComponents(
 	components := make(map[string]*model.KubernetesComponent)
 
 	for _, pvc := range pvcs {
-		id := pvc.Labels[InstanceIdLabel]
-		component := ensureAndGetKubernetesComponent(components, id)
+		component := ensureAndGetKubernetesComponent(components, pvc.GetLabels())
 		component.PersistentVolumeClaims = append(component.PersistentVolumeClaims, &pvc)
 	}
 
 	for _, deployment := range deployments {
-		id := deployment.Labels[InstanceIdLabel]
-		component := ensureAndGetKubernetesComponent(components, id)
+		component := ensureAndGetKubernetesComponent(components, deployment.GetLabels())
 		component.Deployments = append(component.Deployments, &deployment)
 	}
 
 	for _, ing := range ings {
-		id := ing.Labels[InstanceIdLabel]
-		component := ensureAndGetKubernetesComponent(components, id)
+		component := ensureAndGetKubernetesComponent(components, ing.GetLabels())
 		component.Ingresses = append(component.Ingresses, &ing)
 	}
 
 	for _, svc := range svcs {
-		id := svc.Labels[InstanceIdLabel]
-		component := ensureAndGetKubernetesComponent(components, id)
+		component := ensureAndGetKubernetesComponent(components, svc.GetLabels())
 		component.Services = append(component.Services, &svc)
 	}
 
 	for _, account := range sAccounts {
-		id := account.Labels[InstanceIdLabel]
-		component := ensureAndGetKubernetesComponent(components, id)
+		component := ensureAndGetKubernetesComponent(components, account.GetLabels())
 		component.ServiceAccounts = append(component.ServiceAccounts, &account)
 	}
 
 	for _, secret := range secrets {
-		id := secret.Labels[InstanceIdLabel]
-		component := ensureAndGetKubernetesComponent(components, id)
+		component := ensureAndGetKubernetesComponent(components, secret.GetLabels())
 		component.Secrets = append(component.Secrets, &secret)
 	}
 
@@ -262,8 +269,9 @@ func groupIntoComponents(
 }
 
 func ensureAndGetKubernetesComponent(components map[string]*model.KubernetesComponent,
-	id string) *model.KubernetesComponent {
+	labels map[string]string) *model.KubernetesComponent {
 
+	id := labels[InstanceIdLabel]
 	component, found := components[id]
 	if !found {
 		component = &model.KubernetesComponent{}
@@ -501,6 +509,23 @@ func (k *K8Fabricator) DeleteAllByInstanceId(instanceId string) error {
 			return err
 		}
 	}
+
+	endpoints, err := k.client.Endpoints(api.NamespaceDefault).List(api.ListOptions{
+		LabelSelector: selector,
+	})
+	if err != nil {
+		logger.Error("List endpoints failed:", err)
+		return err
+	}
+	for _, i := range endpoints.Items {
+		name = i.ObjectMeta.Name
+		logger.Debug("Delete endpoint:", name)
+		err = k.client.Endpoints(api.NamespaceDefault).Delete(name)
+		if err != nil {
+			logger.Error("Delete endpoint failed:", err)
+			return err
+		}
+	}
 	return nil
 }
 
@@ -542,7 +567,7 @@ func (k *K8Fabricator) GetAllPersistentVolumes() ([]api.PersistentVolume, error)
 	return pvList.Items, nil
 }
 
-func (k *K8Fabricator) GetService(instanceId string) ([]api.Service, error) {
+func (k *K8Fabricator) GetServiceByInstanceId(instanceId string) ([]api.Service, error) {
 	response := []api.Service{}
 
 	selector, err := getSelectorForInstanceIdLabel(instanceId)
@@ -559,6 +584,24 @@ func (k *K8Fabricator) GetService(instanceId string) ([]api.Service, error) {
 	}
 
 	return serviceList.Items, nil
+}
+
+func (k *K8Fabricator) GetService(name string) (*api.Service, error) {
+	service, err := k.client.Services(api.NamespaceDefault).Get(name)
+	if err != nil {
+		return &api.Service{}, err
+	}
+	return service, nil
+}
+
+func (k *K8Fabricator) CreateService(service api.Service) error {
+	_, err := k.client.Services(api.NamespaceDefault).Create(&service)
+	return err
+}
+
+func (k *K8Fabricator) DeleteService(name string) error {
+	err := k.client.Services(api.NamespaceDefault).Delete(name)
+	return err
 }
 
 func (k *K8Fabricator) GetServices() ([]api.Service, error) {
@@ -580,6 +623,24 @@ func (k *K8Fabricator) GetServices() ([]api.Service, error) {
 	return serviceList.Items, nil
 }
 
+func (k *K8Fabricator) GetEndpoint(name string) (*api.Endpoints, error) {
+	result, err := k.client.Endpoints(api.NamespaceDefault).Get(name)
+	if err != nil {
+		return &api.Endpoints{}, err
+	}
+	return result, nil
+}
+
+func (k *K8Fabricator) CreateEndpoint(endpoint api.Endpoints) error {
+	_, err := k.client.Endpoints(api.NamespaceDefault).Create(&endpoint)
+	return err
+}
+
+func (k *K8Fabricator) DeleteEndpoint(name string) error {
+	err := k.client.Endpoints(api.NamespaceDefault).Delete(name)
+	return err
+}
+
 func (k *K8Fabricator) ListDeployments() (*extensions.DeploymentList, error) {
 	selector, err := getSelectorForManagedByLabel()
 	if err != nil {
@@ -589,16 +650,8 @@ func (k *K8Fabricator) ListDeployments() (*extensions.DeploymentList, error) {
 	return NewDeploymentControllerManager(k.extensionsClient, k.cephClient).List(selector)
 }
 
-type PodStatus struct {
-	PodName         string
-	InstanceId      string
-	Status          api.PodPhase
-	StatusMessage   string
-	ContainerStatus []api.ContainerStatus
-}
-
-func (k *K8Fabricator) GetPodsStateByInstanceId(instanceId string) ([]PodStatus, error) {
-	result := []PodStatus{}
+func (k *K8Fabricator) GetPodsByInstanceId(instanceId string) ([]api.Pod, error) {
+	result := []api.Pod{}
 	selector, err := getSelectorForInstanceIdLabel(instanceId)
 	if err != nil {
 		return result, err
@@ -607,43 +660,32 @@ func (k *K8Fabricator) GetPodsStateByInstanceId(instanceId string) ([]PodStatus,
 	pods, err := k.client.Pods(api.NamespaceDefault).List(api.ListOptions{
 		LabelSelector: selector,
 	})
-	if err != nil {
-		return result, err
-	}
-
-	for _, pod := range pods.Items {
-		podStatus := PodStatus{
-			pod.Name, instanceId, pod.Status.Phase, pod.Status.Message, pod.Status.ContainerStatuses,
-		}
-		result = append(result, podStatus)
-	}
-	return result, nil
+	return pods.Items, err
 }
 
-func (k *K8Fabricator) GetPodsStateForAllServices() (map[string][]PodStatus, error) {
-	result := map[string][]PodStatus{}
+type SortableEvents []api.Event
 
-	selector, err := getSelectorForManagedByLabel()
+func (list SortableEvents) Len() int {
+	return len(list)
+}
+
+func (list SortableEvents) Swap(i, j int) {
+	list[i], list[j] = list[j], list[i]
+}
+
+func (list SortableEvents) Less(i, j int) bool {
+	return list[i].LastTimestamp.Time.Before(list[j].LastTimestamp.Time)
+}
+
+func (k *K8Fabricator) GetPodEvents(pod api.Pod) ([]api.Event, error) {
+
+	eventsList, err := k.client.Events(api.NamespaceDefault).Search(&pod)
 	if err != nil {
-		return result, err
+		return []api.Event{}, err
 	}
 
-	pods, err := k.client.Pods(api.NamespaceDefault).List(api.ListOptions{
-		LabelSelector: selector,
-	})
-	if err != nil {
-		return result, err
-	}
-
-	for _, pod := range pods.Items {
-		instanceId := pod.Labels[InstanceIdLabel]
-		if instanceId != "" {
-			podStatus := PodStatus{
-				pod.Name, instanceId, pod.Status.Phase, pod.Status.Message, pod.Status.ContainerStatuses,
-			}
-			result[instanceId] = append(result[instanceId], podStatus)
-		}
-	}
+	var result SortableEvents = eventsList.Items
+	sort.Sort(result)
 	return result, nil
 }
 
@@ -703,6 +745,24 @@ func (k *K8Fabricator) DeleteSecret(name string) error {
 
 func (k *K8Fabricator) UpdateSecret(secret api.Secret) error {
 	_, err := k.client.Secrets(api.NamespaceDefault).Update(&secret)
+	return err
+}
+
+func (k *K8Fabricator) GetIngress(name string) (*extensions.Ingress, error) {
+	result, err := k.extensionsClient.Ingress(api.NamespaceDefault).Get(name)
+	if err != nil {
+		return &extensions.Ingress{}, err
+	}
+	return result, nil
+}
+
+func (k *K8Fabricator) CreateIngress(ingress extensions.Ingress) error {
+	_, err := k.extensionsClient.Ingress(api.NamespaceDefault).Create(&ingress)
+	return err
+}
+
+func (k *K8Fabricator) DeleteIngress(name string) error {
+	err := k.extensionsClient.Ingress(api.NamespaceDefault).Delete(name, nil)
 	return err
 }
 
@@ -800,7 +860,7 @@ func findConfigMapValue(configMaps *api.ConfigMapList, selector *api.ConfigMapKe
 
 func getSelectorForInstanceIdLabel(instanceId string) (labels.Selector, error) {
 	selector := labels.NewSelector()
-	managedByReq, err := labels.NewRequirement(managedByLabel, labels.EqualsOperator, sets.NewString("TAP"))
+	managedByReq, err := labels.NewRequirement(managedByLabel, labels.EqualsOperator, sets.NewString(managedByValue))
 	if err != nil {
 		return selector, err
 	}
@@ -813,7 +873,7 @@ func getSelectorForInstanceIdLabel(instanceId string) (labels.Selector, error) {
 
 func getSelectorForManagedByLabel() (labels.Selector, error) {
 	selector := labels.NewSelector()
-	managedByReq, err := labels.NewRequirement(managedByLabel, labels.EqualsOperator, sets.NewString("TAP"))
+	managedByReq, err := labels.NewRequirement(managedByLabel, labels.EqualsOperator, sets.NewString(managedByValue))
 	if err != nil {
 		return selector, err
 	}
