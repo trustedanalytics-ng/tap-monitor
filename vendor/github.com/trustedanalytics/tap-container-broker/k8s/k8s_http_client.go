@@ -17,9 +17,9 @@ package k8s
 
 import (
 	"net/http"
+	"os"
 	"strconv"
 
-	"github.com/cloudfoundry-community/go-cfenv"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -113,7 +113,7 @@ func GetNewExtensionsClient(creds K8sClusterCredentials) (ExtensionsInterface, e
 }
 
 func getKubernetesConfig(creds K8sClusterCredentials) (*restclient.Config, error) {
-	sslActive, parseError := strconv.ParseBool(cfenv.CurrentEnv()["KUBE_SSL_ACTIVE"])
+	sslActive, parseError := strconv.ParseBool(os.Getenv("KUBE_SSL_ACTIVE"))
 	if parseError != nil {
 		logger.Error("KUBE_SSL_ACTIVE env probably not set!")
 		return nil, parseError

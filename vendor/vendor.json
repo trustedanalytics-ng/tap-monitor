@@ -3,12 +3,6 @@
 	"ignore": "test",
 	"package": [
 		{
-			"checksumSHA1": "6kjx/ahDLNBFxRg4HpkVxCG6AXs=",
-			"path": "github.com/cloudfoundry-community/go-cfenv",
-			"revision": "b4bebec47a425334d2a076cf99329464c9e611f3",
-			"revisionTime": "2015-12-16T23:05:33Z"
-		},
-		{
 			"checksumSHA1": "XZ/RQf9rdLpFHKhstEckOpGqsOU=",
 			"path": "github.com/gocraft/web",
 			"revision": "054fd625232f8041af2c88320633047eb0574dc0",
