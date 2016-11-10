@@ -135,6 +135,12 @@
 			"revisionTime": "2016-03-11T21:55:03Z"
 		},
 		{
+			"checksumSHA1": "3uOFNCcfJRpmHi69Gp3P2Hz9kxw=",
+			"path": "github.com/trustedanalytics/tap-catalog/builder",
+			"revision": "4722a770af0786a65fd5a3033802203fb219075d",
+			"revisionTime": "2016-11-10T11:54:43Z"
+		},
+		{
 			"checksumSHA1": "aVFW5lOR57NifeKqK+yrwNTbZu0=",
 			"path": "github.com/trustedanalytics/tap-catalog/client",
 			"revision": "01ad243f6a1e53d9b2465dd8c9d6a7aafb76962b",
