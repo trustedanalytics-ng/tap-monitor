@@ -38,7 +38,6 @@ import (
 var logger, _ = commonLogger.InitLogger("app")
 var dockerHubAddress = os.Getenv("IMAGE_FACTORY_HUB_ADDRESS")
 var genericServiceTemplateID = os.Getenv("GENERIC_SERVICE_TEMPLATE_ID")
-var imagesRepoUri = os.Getenv("DOCKER_IMAGE_REPOSITORY")
 
 const checkInternalSeconds = 5
 
@@ -177,8 +176,25 @@ func ExecuteFlowForUserDefinedApp(image catalogModels.Image) error {
 	return nil
 }
 
-func ExecuteFlowForUserDefinedOffering(image catalogModels.Image) error {
+func ExecuteFlowForUserDefinedOffering(image catalogModels.Image) (err error) {
 	logger.Infof("started offering creation from image with id %s", image.Id)
+	offeringID := catalogModels.GetOfferingId(image.Id)
+	defer func() {
+		if err == nil {
+			_, _, err = UpdateOffering(offeringID, "State", catalogModels.ServiceStateDeploying, catalogModels.ServiceStateReady)
+			if err != nil {
+				logger.Errorf("cannot update state of service with id %s from DEPLOYING to READY", offeringID)
+			}
+			logger.Infof("offering with id %s created successfully", offeringID)
+		} else {
+			logger.Errorf("error while creating offering with id %s from image with id %s", offeringID, image.Id)
+			_, _, err = UpdateOffering(offeringID, "State", catalogModels.ServiceStateDeploying, catalogModels.ServiceStateOffline)
+			if err != nil {
+				logger.Errorf("cannot update state of offering with id %s from DEPLOYING to OFFLINE", offeringID)
+			}
+		}
+	}()
+
 	newTemplate, _, err := config.TemplateRepositoryApi.GetRawTemplate(genericServiceTemplateID)
 	if err != nil {
 		logger.Errorf("cannot fetch generic template with id %s from Template Repository", genericServiceTemplateID)
@@ -198,7 +214,7 @@ func ExecuteFlowForUserDefinedOffering(image catalogModels.Image) error {
 		return err
 	}
 
-	newImageForTemplate := imagesRepoUri + "/" + image.Id
+	newImageForTemplate := dockerHubAddress + "/" + image.Id
 	templateID := templateEntryFromCatalog.Id
 
 	newTemplate, err = adjustTemplateIdAndImage(templateID, newImageForTemplate, newTemplate)
@@ -219,8 +235,6 @@ func ExecuteFlowForUserDefinedOffering(image catalogModels.Image) error {
 		return err
 	}
 
-	offeringID := catalogModels.GetOfferingId(image.Id)
-
 	offering, _, err := config.CatalogApi.GetService(offeringID)
 	if err != nil {
 		logger.Errorf("cannot fetch service with id %s from catalog", offeringID)
@@ -232,15 +246,7 @@ func ExecuteFlowForUserDefinedOffering(image catalogModels.Image) error {
 		logger.Errorf("cannot update service with id %s with new templateId equal to: %s", offeringID, templateID)
 		return err
 	}
-
-	offering, _, err = UpdateOffering(offeringID, "State", catalogModels.ServiceStateDeploying, catalogModels.ServiceStateReady)
-	if err != nil {
-		logger.Errorf("cannot update state of service with id %s from DEPLOYING to READY", offeringID)
-		return err
-	}
-
-	logger.Infof("offering with id %s created successfully", offeringID)
-	return nil
+	return
 }
 
 func adjustTemplateIdAndImage(templateID, image string, rawTemplate templateRepositoryModels.RawTemplate) (templateRepositoryModels.RawTemplate, error) {
