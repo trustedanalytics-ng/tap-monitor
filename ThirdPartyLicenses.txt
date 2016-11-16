@@ -505,7 +505,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 =========================================================================
-op/mapstructure
+op/go-logging
 =========================================================================
 
 Copyright (c) 2013 Örjan Persson. All rights reserved.
