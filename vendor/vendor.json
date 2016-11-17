@@ -165,16 +165,16 @@
 			"revisionTime": "2016-10-07T12:31:08Z"
 		},
 		{
-			"checksumSHA1": "xv6zp0/vpWSYaNHlPUrOGiuOWQA=",
+			"checksumSHA1": "xoULKAI2iB/zc8DcMScU0de3Kxw=",
 			"path": "github.com/trustedanalytics/tap-container-broker/k8s",
-			"revision": "7de7b529f68b16d022851feacf57aa2d01c788a5",
-			"revisionTime": "2016-11-08T11:05:03Z"
+			"revision": "a12c2d7c380015d1a87074d2b69b79279c20dd8a",
+			"revisionTime": "2016-11-17T09:48:43Z"
 		},
 		{
 			"checksumSHA1": "OA6MMjj3Pj5+B+1LSECd2ZaT3tU=",
 			"path": "github.com/trustedanalytics/tap-container-broker/models",
-			"revision": "7de7b529f68b16d022851feacf57aa2d01c788a5",
-			"revisionTime": "2016-11-08T11:05:03Z"
+			"revision": "a12c2d7c380015d1a87074d2b69b79279c20dd8a",
+			"revisionTime": "2016-11-17T09:48:43Z"
 		},
 		{
 			"checksumSHA1": "ukXcanknqGE85PrDaHsU+ZkLYsM=",

@@ -7,6 +7,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/util/intstr"
+
+	"github.com/trustedanalytics/tap-go-common/util"
 )
 
 func MakeIngressForServices(instanceId, hostname string, services []api.Service) extensions.Ingress {
@@ -54,7 +56,7 @@ func MakeServiceForPorts(instanceId string, ports []int32) api.Service {
 	}
 
 	return api.Service{
-		ObjectMeta: getK8sObjectMeta(instanceId),
+		ObjectMeta: getK8sObjectMetaWithShortIdAsName(instanceId),
 		Spec: api.ServiceSpec{
 			Ports: servicePorts,
 		},
@@ -73,7 +75,7 @@ func MakeEndpointForPorts(instanceId, ip string, ports []int32) api.Endpoints {
 	}
 
 	return api.Endpoints{
-		ObjectMeta: getK8sObjectMeta(instanceId),
+		ObjectMeta: getK8sObjectMetaWithShortIdAsName(instanceId),
 		Subsets: []api.EndpointSubset{
 			{
 				Addresses: []api.EndpointAddress{
@@ -97,6 +99,13 @@ func GetK8sTapLabels(instanceId string) map[string]string {
 func getK8sObjectMeta(instanceId string) api.ObjectMeta {
 	return api.ObjectMeta{
 		Name:   instanceId,
+		Labels: GetK8sTapLabels(instanceId),
+	}
+}
+
+func getK8sObjectMetaWithShortIdAsName(instanceId string) api.ObjectMeta {
+	return api.ObjectMeta{
+		Name:   util.UuidToShortDnsName(instanceId),
 		Labels: GetK8sTapLabels(instanceId),
 	}
 }
