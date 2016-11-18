@@ -33,6 +33,8 @@ import (
 	"github.com/trustedanalytics/tap-go-common/util"
 	imageFactoryModels "github.com/trustedanalytics/tap-image-factory/models"
 	templateRepositoryModels "github.com/trustedanalytics/tap-template-repository/model"
+
+	"github.com/trustedanalytics/tap-monitor/app/synchronization"
 )
 
 var logger, _ = commonLogger.InitLogger("app")
@@ -40,6 +42,8 @@ var dockerHubAddress = os.Getenv("IMAGE_FACTORY_HUB_ADDRESS")
 var genericServiceTemplateID = os.Getenv("GENERIC_SERVICE_TEMPLATE_ID")
 
 const checkInternalSeconds = 5
+
+var catalogInstancesAndK8SCheckInternal = 60 * time.Second
 
 // todo this is temporary -> DPNG-10694
 var createInstanceQueue = []string{}
@@ -60,21 +64,40 @@ func StartMonitor(waitGroup *sync.WaitGroup) {
 	defer queueManager.Connection.Close()
 	defer queueManager.Channel.Close()
 
-	monitoringLoop(queueManager)
+	interval := os.Getenv("CATALOG_INSTANCES_AND_K8S_SYNC_INTERVAL")
+	if interval != "" {
+		tmp, err := time.ParseDuration(interval)
+		if err != nil {
+			logger.Fatal("Specified interval is not a duration: " + interval)
+		}
+		logger.Info("Overriding default k8s and catalog sync interval to: ", tmp)
+		catalogInstancesAndK8SCheckInternal = tmp
+	}
+	k8SAndCatalogSyncer := synchronization.GetK8SAndCatalogSynchronizer(config.CatalogApi, config.KubernetesApi)
+
+	monitoringLoop(queueManager, k8SAndCatalogSyncer)
 	waitGroup.Done()
 }
 
-func monitoringLoop(queueManager *QueueManager) {
+func monitoringLoop(queueManager *QueueManager, k8SAndCatalogSyncer *synchronization.K8SAndCatalogSyncer) {
+	queueManagerTicker := time.NewTicker(checkInternalSeconds * time.Second)
+	catalogAndK8sSyncerTicker := time.NewTicker(catalogInstancesAndK8SCheckInternal)
 	for {
 		select {
-		case <-time.After(checkInternalSeconds * time.Second):
+		case <-queueManagerTicker.C:
 			if err := queueManager.CheckCatalogRequestedInstances(); err != nil {
 				logger.Error("Proccessing Catalog instances error:", err)
 			}
 			if err := queueManager.CheckCatalogRequestedImages(); err != nil {
 				logger.Error("Proccessing Catalog images error:", err)
 			}
+		case <-catalogAndK8sSyncerTicker.C:
+			if err := k8SAndCatalogSyncer.SingleSync(); err != nil {
+				logger.Error("Syncing Catalog state with K8S failed:", err)
+			}
 		case <-util.GetTerminationObserverChannel():
+			queueManagerTicker.Stop()
+			catalogAndK8sSyncerTicker.Stop()
 			logger.Info("Monitoring stopped")
 			return
 		}
@@ -364,7 +387,6 @@ func (q *QueueManager) sendToQueueImageFactoryBuild(image catalogModels.Image) {
 func (q *QueueManager) sendMessageOnQueue(queueMessage []byte, err error, queueName, routingKey string, errorMsg ...interface{}) {
 	if err != nil {
 		logger.Error(errorMsg...)
-		// TODO question about ImageFactory break statement
 		return
 	}
 	q.sendMessageAndReconnectIfError(queueMessage, queueName, routingKey)
