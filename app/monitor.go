@@ -85,7 +85,7 @@ func monitoringLoop(queueManager *QueueManager, k8SAndCatalogSyncer *synchroniza
 	for {
 		select {
 		case <-queueManagerTicker.C:
-			if err := queueManager.CheckCatalogRequestedInstances(); err != nil {
+			if err := queueManager.CheckCatalogInstances(); err != nil {
 				logger.Error("Proccessing Catalog instances error:", err)
 			}
 			if err := queueManager.CheckCatalogRequestedImages(); err != nil {
@@ -336,25 +336,28 @@ func getImageAddress(id string) string {
 	return dockerHubAddress + "/" + id
 }
 
-func (q *QueueManager) CheckCatalogRequestedInstances() error {
+func (q *QueueManager) CheckCatalogInstances() error {
 	instances, _, err := config.CatalogApi.ListInstances()
 	if err != nil {
 		return err
 	}
 
 	for _, instance := range instances {
-		if instance.State == catalogModels.InstanceStateRequested {
+		switch instance.State {
+		case catalogModels.InstanceStateRequested:
 			if isInstanceIdInArray(createInstanceQueue, instance.Id) {
 				continue
 			}
 			q.sendToQueueBrokerCreate(instance)
 			createInstanceQueue = append(createInstanceQueue, instance.Id)
-		} else if instance.State == catalogModels.InstanceStateDestroyReq {
+		case catalogModels.InstanceStateDestroyReq:
 			if isInstanceIdInArray(deleteInstanceQueue, instance.Id) {
 				continue
 			}
 			q.sendToQueueBrokerDelete(instance)
 			deleteInstanceQueue = append(deleteInstanceQueue, instance.Id)
+		case catalogModels.InstanceStateStartReq, catalogModels.InstanceStateStopReq, catalogModels.InstanceStateReconfiguration:
+			q.sendToQueueScale(instance)
 		}
 	}
 	return nil
@@ -362,34 +365,42 @@ func (q *QueueManager) CheckCatalogRequestedInstances() error {
 
 func (q *QueueManager) sendToQueueBrokerCreate(instance catalogModels.Instance) {
 	queueMessage, err := prepareCreateInstanceRequest(instance)
-	q.sendMessageOnQueue(queueMessage, err,
-		containerBrokerModels.CONTAINER_BROKER_QUEUE_NAME,
-		containerBrokerModels.CONTAINER_BROKER_CREATE_ROUTING_KEY,
-		"Failed to prepare CreateInstanceRequest for instance: ", instance.Id, err)
+	if err != nil {
+		logger.Errorf("Failed to prepare CreateInstanceRequest for instance: %s, error: %v", instance.Id, err)
+		return
+	}
+	q.sendMessageAndReconnectIfError(queueMessage, containerBrokerModels.CONTAINER_BROKER_QUEUE_NAME,
+		containerBrokerModels.CONTAINER_BROKER_CREATE_ROUTING_KEY)
 }
 
 func (q *QueueManager) sendToQueueBrokerDelete(instance catalogModels.Instance) {
 	queueMessage, err := prepareDeleteInstanceRequest(instance)
-	q.sendMessageOnQueue(queueMessage, err,
-		containerBrokerModels.CONTAINER_BROKER_QUEUE_NAME,
-		containerBrokerModels.CONTAINER_BROKER_DELETE_ROUTING_KEY,
-		"Failed to prepare DeleteRequest for instance: ", instance.Id, err)
+	if err != nil {
+		logger.Errorf("Failed to prepare DeleteRequest for instance: %s, error: %v", instance.Id, err)
+		return
+	}
+	q.sendMessageAndReconnectIfError(queueMessage, containerBrokerModels.CONTAINER_BROKER_QUEUE_NAME,
+		containerBrokerModels.CONTAINER_BROKER_DELETE_ROUTING_KEY)
+}
+
+func (q *QueueManager) sendToQueueScale(instance catalogModels.Instance) {
+	queueMessage, err := prepareScaleInstanceRequest(instance)
+	if err != nil {
+		logger.Errorf("Failed to prepare ScaleRequest for instance: %s, error: %v", instance.Id, err)
+		return
+	}
+	q.sendMessageAndReconnectIfError(queueMessage, containerBrokerModels.CONTAINER_BROKER_QUEUE_NAME,
+		containerBrokerModels.CONTAINER_BROKER_SCALE_ROUTING_KEY)
 }
 
 func (q *QueueManager) sendToQueueImageFactoryBuild(image catalogModels.Image) {
 	queueMessage, err := prepareBuildImageRequest(image)
-	q.sendMessageOnQueue(queueMessage, err,
-		imageFactoryModels.IMAGE_FACTORY_QUEUE_NAME,
-		imageFactoryModels.IMAGE_FACTORY_IMAGE_ROUTING_KEY,
-		"Failed to prepare BuildImagePostRequest for image: ", image.Id, err)
-}
-
-func (q *QueueManager) sendMessageOnQueue(queueMessage []byte, err error, queueName, routingKey string, errorMsg ...interface{}) {
 	if err != nil {
-		logger.Error(errorMsg...)
+		logger.Errorf("Failed to prepare BuildImagePostRequest for image: %s, error: %v", image.Id, err)
 		return
 	}
-	q.sendMessageAndReconnectIfError(queueMessage, queueName, routingKey)
+	q.sendMessageAndReconnectIfError(queueMessage, imageFactoryModels.IMAGE_FACTORY_QUEUE_NAME,
+		imageFactoryModels.IMAGE_FACTORY_IMAGE_ROUTING_KEY)
 }
 
 func (q *QueueManager) sendMessageAndReconnectIfError(message []byte, queueName, routingKey string) {

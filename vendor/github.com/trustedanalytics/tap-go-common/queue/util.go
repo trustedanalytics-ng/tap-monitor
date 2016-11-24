@@ -21,8 +21,8 @@ import (
 
 	"github.com/streadway/amqp"
 
-	"github.com/trustedanalytics/tap-go-common/util"
 	commonLogger "github.com/trustedanalytics/tap-go-common/logger"
+	"github.com/trustedanalytics/tap-go-common/util"
 )
 
 var logger, _ = commonLogger.InitLogger("queue")

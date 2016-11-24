@@ -54,7 +54,7 @@ func TestUtilsDifferentiationOfCases(t *testing.T) {
 	if !cc.shouldHandle(someId, nil, &K8SObject{}) {
 		t.Error("New case wasn't marked for handling - probably detected it as previous one?")
 	}
-	time.Sleep(baseTestRetryTimeout + baseTestRetryTimeout / 2)
+	time.Sleep(baseTestRetryTimeout + baseTestRetryTimeout/2)
 	if !cc.shouldHandle(someId, nil, nil) {
 		t.Error("Case wasn't marked for handling")
 	}

@@ -29,7 +29,7 @@ import (
 )
 
 type TemplateRepository interface {
-	GenerateParsedTemplate(templateId, uuid string, replacements map[string]string) (model.Template, error)
+	GenerateParsedTemplate(templateId, uuid, planName string, replacements map[string]string) (model.Template, int, error)
 	CreateTemplate(template model.RawTemplate) (int, error)
 	GetRawTemplate(templateId string) (model.RawTemplate, int, error)
 	DeleteTemplate(templateId string) (int, error)
@@ -51,20 +51,12 @@ func NewTemplateRepositoryBasicAuth(address, username, password string) (*Templa
 	return &TemplateRepositoryConnector{address, username, password, client}, nil
 }
 
-func NewTemplateRepositoryCa(address, username, password, certPemFile, keyPemFile, caPemFile string) (*TemplateRepositoryConnector, error) {
-	client, _, err := brokerHttp.GetHttpClientWithCertAndCaFromFile(certPemFile, keyPemFile, caPemFile)
-	if err != nil {
-		return nil, err
-	}
-	return &TemplateRepositoryConnector{address, username, password, client}, nil
-}
-
-func (t *TemplateRepositoryConnector) GenerateParsedTemplate(templateId, uuid string,
-	replacements map[string]string) (model.Template, error) {
+func (t *TemplateRepositoryConnector) GenerateParsedTemplate(templateId, uuid, planName string,
+	replacements map[string]string) (model.Template, int, error) {
 
 	template := model.Template{}
 
-	address := fmt.Sprintf("%s/api/v1/parsed_template/%s?instanceId=%s", t.Address, templateId, uuid)
+	address := fmt.Sprintf("%s/api/v1/parsed_template/%s?instanceId=%s&planName=%s", t.Address, templateId, uuid, planName)
 	if len(replacements) > 0 {
 		params := url.Values{}
 		for key, value := range replacements {
@@ -76,16 +68,16 @@ func (t *TemplateRepositoryConnector) GenerateParsedTemplate(templateId, uuid st
 	auth := brokerHttp.BasicAuth{t.Username, t.Password}
 	status, body, err := brokerHttp.RestGET(address, brokerHttp.GetBasicAuthHeader(&auth), t.Client)
 	if err != nil {
-		return template, err
+		return template, status, err
 	}
 	err = json.Unmarshal(body, &template)
 	if err != nil {
-		return template, err
+		return template, http.StatusInternalServerError, err
 	}
 	if status != http.StatusOK {
-		return template, errors.New("Bad response status: " + strconv.Itoa(status) + ". Body: " + string(body))
+		return template, status, errors.New("Bad response status: " + strconv.Itoa(status) + ". Body: " + string(body))
 	}
-	return template, nil
+	return template, http.StatusOK, nil
 }
 
 func (t *TemplateRepositoryConnector) CreateTemplate(template model.RawTemplate) (int, error) {
@@ -146,7 +138,7 @@ func (t *TemplateRepositoryConnector) GetTemplateRepositoryHealth() error {
 	auth := brokerHttp.BasicAuth{t.Username, t.Password}
 	status, _, err := brokerHttp.RestGET(url, brokerHttp.GetBasicAuthHeader(&auth), t.Client)
 	if status != http.StatusOK {
-		err = errors.New("Invalid health status: " + string(status))
+		err = errors.New("Invalid health status: " + strconv.Itoa(status))
 	}
 	return err
 }

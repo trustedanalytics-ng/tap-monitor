@@ -231,38 +231,32 @@ func groupIntoComponents(
 
 	components := make(map[string]*model.KubernetesComponent)
 
-	for i := range pvcs {
-		pvc := pvcs[i]
+	for _, pvc := range pvcs {
 		component := ensureAndGetKubernetesComponent(components, pvc.GetLabels())
 		component.PersistentVolumeClaims = append(component.PersistentVolumeClaims, &pvc)
 	}
 
-	for i := range deployments {
-		deployment := deployments[i]
+	for _, deployment := range deployments {
 		component := ensureAndGetKubernetesComponent(components, deployment.GetLabels())
 		component.Deployments = append(component.Deployments, &deployment)
 	}
 
-	for i := range ings {
-		ing := ings[i]
+	for _, ing := range ings {
 		component := ensureAndGetKubernetesComponent(components, ing.GetLabels())
 		component.Ingresses = append(component.Ingresses, &ing)
 	}
 
-	for i := range svcs {
-		svc := svcs[i]
+	for _, svc := range svcs {
 		component := ensureAndGetKubernetesComponent(components, svc.GetLabels())
 		component.Services = append(component.Services, &svc)
 	}
 
-	for i := range sAccounts {
-		account := sAccounts[i]
+	for _, account := range sAccounts {
 		component := ensureAndGetKubernetesComponent(components, account.GetLabels())
 		component.ServiceAccounts = append(component.ServiceAccounts, &account)
 	}
 
-	for i := range secrets {
-		secret := secrets[i]
+	for _, secret := range secrets {
 		component := ensureAndGetKubernetesComponent(components, secret.GetLabels())
 		component.Secrets = append(component.Secrets, &secret)
 	}

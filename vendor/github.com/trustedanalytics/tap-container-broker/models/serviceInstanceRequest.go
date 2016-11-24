@@ -23,7 +23,7 @@ type CreateInstanceRequest struct {
 }
 
 type ScaleInstanceRequest struct {
-	Replicas int `json:"replicas"`
+	Id string `json:"id"`
 }
 
 type DeleteRequest struct {

@@ -38,6 +38,12 @@ func getDeleteInstanceRequest(instance catalogModels.Instance) containerBrokerMo
 	}
 }
 
+func getScaleInstanceRequest(instance catalogModels.Instance) containerBrokerModels.ScaleInstanceRequest {
+	return containerBrokerModels.ScaleInstanceRequest{
+		Id: instance.Id,
+	}
+}
+
 func getBuildImagePostRequest(image catalogModels.Image) imageFactoryModels.BuildImagePostRequest {
 	return imageFactoryModels.BuildImagePostRequest{
 		ImageId: image.Id,
@@ -51,6 +57,11 @@ func prepareCreateInstanceRequest(instance catalogModels.Instance) ([]byte, erro
 
 func prepareDeleteInstanceRequest(instance catalogModels.Instance) ([]byte, error) {
 	request := getDeleteInstanceRequest(instance)
+	return json.Marshal(request)
+}
+
+func prepareScaleInstanceRequest(instance catalogModels.Instance) ([]byte, error) {
+	request := getScaleInstanceRequest(instance)
 	return json.Marshal(request)
 }
 

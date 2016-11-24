@@ -13,9 +13,9 @@ import (
 
 	"github.com/patrickmn/go-cache"
 
+	"github.com/trustedanalytics/tap-catalog/builder"
 	catalogApi "github.com/trustedanalytics/tap-catalog/client"
 	"github.com/trustedanalytics/tap-catalog/models"
-	"github.com/trustedanalytics/tap-catalog/builder"
 	kubernetesApi "github.com/trustedanalytics/tap-container-broker/k8s"
 	trModels "github.com/trustedanalytics/tap-template-repository/model"
 )
@@ -318,4 +318,3 @@ func filterInstancesOnK8SObjects(instances []*models.Instance, k8sObjects []*K8S
 		return predicate(ko)
 	})
 }
-
