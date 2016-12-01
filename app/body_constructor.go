@@ -17,8 +17,6 @@
 package app
 
 import (
-	"encoding/json"
-
 	catalogModels "github.com/trustedanalytics/tap-catalog/models"
 	containerBrokerModels "github.com/trustedanalytics/tap-container-broker/models"
 	imageFactoryModels "github.com/trustedanalytics/tap-image-factory/models"
@@ -32,40 +30,20 @@ func getCreateInstanceRequest(instance catalogModels.Instance) containerBrokerMo
 	}
 }
 
-func getDeleteInstanceRequest(instance catalogModels.Instance) containerBrokerModels.DeleteRequest {
+func getDeleteInstanceRequest(instanceId string) containerBrokerModels.DeleteRequest {
 	return containerBrokerModels.DeleteRequest{
-		Id: instance.Id,
+		Id: instanceId,
 	}
 }
 
-func getScaleInstanceRequest(instance catalogModels.Instance) containerBrokerModels.ScaleInstanceRequest {
+func getScaleInstanceRequest(instanceId string) containerBrokerModels.ScaleInstanceRequest {
 	return containerBrokerModels.ScaleInstanceRequest{
-		Id: instance.Id,
+		Id: instanceId,
 	}
 }
 
-func getBuildImagePostRequest(image catalogModels.Image) imageFactoryModels.BuildImagePostRequest {
+func getBuildImagePostRequest(imageId string) imageFactoryModels.BuildImagePostRequest {
 	return imageFactoryModels.BuildImagePostRequest{
-		ImageId: image.Id,
+		ImageId: imageId,
 	}
-}
-
-func prepareCreateInstanceRequest(instance catalogModels.Instance) ([]byte, error) {
-	request := getCreateInstanceRequest(instance)
-	return json.Marshal(request)
-}
-
-func prepareDeleteInstanceRequest(instance catalogModels.Instance) ([]byte, error) {
-	request := getDeleteInstanceRequest(instance)
-	return json.Marshal(request)
-}
-
-func prepareScaleInstanceRequest(instance catalogModels.Instance) ([]byte, error) {
-	request := getScaleInstanceRequest(instance)
-	return json.Marshal(request)
-}
-
-func prepareBuildImageRequest(image catalogModels.Image) ([]byte, error) {
-	request := getBuildImagePostRequest(image)
-	return json.Marshal(request)
 }

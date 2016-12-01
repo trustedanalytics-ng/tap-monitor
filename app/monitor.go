@@ -32,24 +32,16 @@ import (
 	"github.com/trustedanalytics/tap-go-common/queue"
 	"github.com/trustedanalytics/tap-go-common/util"
 	imageFactoryModels "github.com/trustedanalytics/tap-image-factory/models"
-	templateRepositoryModels "github.com/trustedanalytics/tap-template-repository/model"
-
 	"github.com/trustedanalytics/tap-monitor/app/synchronization"
+	templateRepositoryModels "github.com/trustedanalytics/tap-template-repository/model"
 )
 
 var logger, _ = commonLogger.InitLogger("app")
 var dockerHubAddress = os.Getenv("IMAGE_FACTORY_HUB_ADDRESS")
 var genericServiceTemplateID = os.Getenv("GENERIC_SERVICE_TEMPLATE_ID")
-
-const checkInternalSeconds = 5
-
 var catalogInstancesAndK8SCheckInternal = 60 * time.Second
 
-// todo this is temporary -> DPNG-10694
-var createInstanceQueue = []string{}
-var deleteInstanceQueue = []string{}
-var pendingImageQueue = []string{}
-var readyImageQueue = []string{}
+const checkAfterErrorIntervalSec = 5 * time.Second
 
 type QueueManager struct {
 	*amqp.Channel
@@ -80,23 +72,21 @@ func StartMonitor(waitGroup *sync.WaitGroup) {
 }
 
 func monitoringLoop(queueManager *QueueManager, k8SAndCatalogSyncer *synchronization.K8SAndCatalogSyncer) {
-	queueManagerTicker := time.NewTicker(checkInternalSeconds * time.Second)
 	catalogAndK8sSyncerTicker := time.NewTicker(catalogInstancesAndK8SCheckInternal)
+
+	go queueManager.MonitorCatalogInstances(catalogModels.WatchFromNow)
+	go queueManager.MonitorCatalogImages(catalogModels.WatchFromNow)
+
+	queueManager.CheckAndApplyActionForAllInstances()
+	queueManager.CheckAndApplyActionForAllImages()
+
 	for {
 		select {
-		case <-queueManagerTicker.C:
-			if err := queueManager.CheckCatalogInstances(); err != nil {
-				logger.Error("Proccessing Catalog instances error:", err)
-			}
-			if err := queueManager.CheckCatalogRequestedImages(); err != nil {
-				logger.Error("Proccessing Catalog images error:", err)
-			}
 		case <-catalogAndK8sSyncerTicker.C:
 			if err := k8SAndCatalogSyncer.SingleSync(); err != nil {
 				logger.Error("Syncing Catalog state with K8S failed:", err)
 			}
 		case <-util.GetTerminationObserverChannel():
-			queueManagerTicker.Stop()
 			catalogAndK8sSyncerTicker.Stop()
 			logger.Info("Monitoring stopped")
 			return
@@ -120,60 +110,82 @@ func convertDependenciesToBindings(dependencies []catalogModels.InstanceDependen
 	return result
 }
 
-func (q *QueueManager) CheckCatalogRequestedImages() error {
+func (q *QueueManager) CheckAndApplyActionForAllImages() {
 	images, _, err := config.CatalogApi.ListImages()
 	if err != nil {
-		logger.Error("Failed to ListImages:", err)
-		return err
+		logger.Error("Failed to ListImages! Actions will be not applied! error:", err)
+		return
 	}
-
 	for _, image := range images {
-		switch image.State {
-		case catalogModels.ImageStatePending:
-			if isInstanceIdInArray(pendingImageQueue, image.Id) {
-				continue
-			}
-			q.sendToQueueImageFactoryBuild(image)
-			pendingImageQueue = append(pendingImageQueue, image.Id)
-
-		case catalogModels.ImageStateReady:
-			if isInstanceIdInArray(readyImageQueue, image.Id) {
-				continue
-			}
-			readyImageQueue = append(readyImageQueue, image.Id)
-
-			if catalogModels.IsApplicationInstance(image.Id) {
-				err := ExecuteFlowForUserDefinedApp(image)
-				if err != nil {
-					logger.Errorf("Failed to create application instance - err: %v", err)
-					break
-				}
-			}
-
-			if catalogModels.IsUserDefinedOffering(image.Id) {
-				err = ExecuteFlowForUserDefinedOffering(image)
-				if err != nil {
-					logger.Errorf("Failed to create offering from binary - err: %v", err)
-					break
-				}
-			}
-		}
+		q.applyActionForImage(image.Id, string(image.State))
 	}
-	return nil
 }
 
-func ExecuteFlowForUserDefinedApp(image catalogModels.Image) error {
-	applicationId := catalogModels.GetApplicationId(image.Id)
+func (q *QueueManager) CheckAndApplyActionForAllInstances() {
+	instances, _, err := config.CatalogApi.ListInstances()
+	if err != nil {
+		logger.Error("Failed to ListInstances! Actions will be not applied! error:", err)
+		return
+	}
+	for _, instance := range instances {
+		q.applyActionForImage(instance.Id, instance.State.String())
+	}
+}
+
+func (q *QueueManager) MonitorCatalogImages(afterIndex uint64) {
+	select {
+	case <-util.GetTerminationObserverChannel():
+		return
+	default:
+		for {
+			stateChange, _, err := config.CatalogApi.WatchImages(afterIndex)
+			if err != nil {
+				logger.Error("WatchImages error:", err)
+				time.Sleep(checkAfterErrorIntervalSec)
+				continue
+			}
+			q.applyActionForImage(stateChange.Id, stateChange.State)
+			afterIndex = stateChange.Index
+		}
+	}
+}
+
+func (q *QueueManager) applyActionForImage(id, state string) {
+	switch catalogModels.ImageState(state) {
+	case catalogModels.ImageStatePending:
+		q.sendMessageAndReconnectIfError(getBuildImagePostRequest(id),
+			imageFactoryModels.IMAGE_FACTORY_QUEUE_NAME,
+			imageFactoryModels.IMAGE_FACTORY_IMAGE_ROUTING_KEY)
+	case catalogModels.ImageStateReady:
+		if catalogModels.IsApplicationInstance(id) {
+			err := ExecuteFlowForUserDefinedApp(id)
+			if err != nil {
+				logger.Errorf("Failed to create application, instance id: %s, err: %v", id, err)
+			}
+		}
+		if catalogModels.IsUserDefinedOffering(id) {
+			err := ExecuteFlowForUserDefinedOffering(id)
+			if err != nil {
+				logger.Errorf("Failed to create offering from binary, instance id: %s, err: %v", id, err)
+			}
+		}
+	default:
+		logger.Debugf("State is not supported by Monitor: %s", state)
+	}
+}
+
+func ExecuteFlowForUserDefinedApp(imageId string) error {
+	applicationId := catalogModels.GetApplicationId(imageId)
 	instances, _, err := config.CatalogApi.ListApplicationInstances(applicationId)
 	if err != nil {
-		logger.Errorf("Failed to get instances of application with id %s and image id %s", applicationId, image.Id)
+		logger.Errorf("Failed to get instances of application with id %s and image id %s", applicationId, imageId)
 		return err
 	}
 
 	if len(instances) == 0 {
 		application, _, err := config.CatalogApi.GetApplication(applicationId)
 		if err != nil {
-			logger.Error("Failed to call GetApplication for image: ", image.Id, err)
+			logger.Error("Failed to call GetApplication for image: ", imageId, err)
 			return err
 		}
 
@@ -183,7 +195,7 @@ func ExecuteFlowForUserDefinedApp(image catalogModels.Image) error {
 			ClassId:  application.Id,
 			Bindings: convertDependenciesToBindings(application.InstanceDependencies),
 			Metadata: []catalogModels.Metadata{
-				{Id: catalogModels.APPLICATION_IMAGE_ADDRESS, Value: getImageAddress(image.Id)},
+				{Id: catalogModels.APPLICATION_IMAGE_ADDRESS, Value: getImageAddress(imageId)},
 			},
 			AuditTrail: catalogModels.AuditTrail{
 				LastUpdateBy: application.AuditTrail.LastUpdateBy,
@@ -192,16 +204,16 @@ func ExecuteFlowForUserDefinedApp(image catalogModels.Image) error {
 		}
 
 		if _, _, err = config.CatalogApi.AddApplicationInstance(application.Id, instance); err != nil {
-			logger.Errorf("Failed to call AddApplicationInstance for image: %s - err: %v", image.Id, err)
+			logger.Errorf("Failed to call AddApplicationInstance for image: %s - err: %v", imageId, err)
 			return err
 		}
 	}
 	return nil
 }
 
-func ExecuteFlowForUserDefinedOffering(image catalogModels.Image) (err error) {
-	logger.Infof("started offering creation from image with id %s", image.Id)
-	offeringID := catalogModels.GetOfferingId(image.Id)
+func ExecuteFlowForUserDefinedOffering(imageId string) (err error) {
+	logger.Infof("started offering creation from image with id %s", imageId)
+	offeringID := catalogModels.GetOfferingId(imageId)
 	defer func() {
 		if err == nil {
 			_, _, err = UpdateOffering(offeringID, "State", catalogModels.ServiceStateDeploying, catalogModels.ServiceStateReady)
@@ -210,7 +222,7 @@ func ExecuteFlowForUserDefinedOffering(image catalogModels.Image) (err error) {
 			}
 			logger.Infof("offering with id %s created successfully", offeringID)
 		} else {
-			logger.Errorf("error while creating offering with id %s from image with id %s", offeringID, image.Id)
+			logger.Errorf("error while creating offering with id %s from image with id %s", offeringID, imageId)
 			_, _, err = UpdateOffering(offeringID, "State", catalogModels.ServiceStateDeploying, catalogModels.ServiceStateOffline)
 			if err != nil {
 				logger.Errorf("cannot update state of offering with id %s from DEPLOYING to OFFLINE", offeringID)
@@ -221,6 +233,12 @@ func ExecuteFlowForUserDefinedOffering(image catalogModels.Image) (err error) {
 	newTemplate, _, err := config.TemplateRepositoryApi.GetRawTemplate(genericServiceTemplateID)
 	if err != nil {
 		logger.Errorf("cannot fetch generic template with id %s from Template Repository", genericServiceTemplateID)
+		return err
+	}
+
+	image, _, err := config.CatalogApi.GetImage(imageId)
+	if err != nil {
+		logger.Error("GetImage error:", err)
 		return err
 	}
 
@@ -336,74 +354,56 @@ func getImageAddress(id string) string {
 	return dockerHubAddress + "/" + id
 }
 
-func (q *QueueManager) CheckCatalogInstances() error {
-	instances, _, err := config.CatalogApi.ListInstances()
-	if err != nil {
-		return err
-	}
-
-	for _, instance := range instances {
-		switch instance.State {
-		case catalogModels.InstanceStateRequested:
-			if isInstanceIdInArray(createInstanceQueue, instance.Id) {
+func (q *QueueManager) MonitorCatalogInstances(afterIndex uint64) {
+	select {
+	case <-util.GetTerminationObserverChannel():
+		return
+	default:
+		for {
+			stateChange, _, err := config.CatalogApi.WatchInstances(afterIndex)
+			if err != nil {
+				logger.Error("WatchInstances error:", err)
+				time.Sleep(checkAfterErrorIntervalSec)
 				continue
 			}
-			q.sendToQueueBrokerCreate(instance)
-			createInstanceQueue = append(createInstanceQueue, instance.Id)
-		case catalogModels.InstanceStateDestroyReq:
-			if isInstanceIdInArray(deleteInstanceQueue, instance.Id) {
-				continue
-			}
-			q.sendToQueueBrokerDelete(instance)
-			deleteInstanceQueue = append(deleteInstanceQueue, instance.Id)
-		case catalogModels.InstanceStateStartReq, catalogModels.InstanceStateStopReq, catalogModels.InstanceStateReconfiguration:
-			q.sendToQueueScale(instance)
+			q.applyActionForInstance(stateChange.Id, stateChange.State)
+			afterIndex = stateChange.Index
 		}
 	}
-	return nil
 }
 
-func (q *QueueManager) sendToQueueBrokerCreate(instance catalogModels.Instance) {
-	queueMessage, err := prepareCreateInstanceRequest(instance)
+func (q *QueueManager) applyActionForInstance(id, state string) {
+	switch catalogModels.InstanceState(state) {
+	case catalogModels.InstanceStateRequested:
+		instance, _, err := config.CatalogApi.GetInstance(id)
+		if err != nil {
+			logger.Errorf("Instance with id: %s is not going to be created! GetInstance error:", id, err)
+		}
+		q.sendMessageAndReconnectIfError(getCreateInstanceRequest(instance),
+			containerBrokerModels.CONTAINER_BROKER_QUEUE_NAME,
+			containerBrokerModels.CONTAINER_BROKER_CREATE_ROUTING_KEY)
+	case catalogModels.InstanceStateDestroyReq:
+		q.sendMessageAndReconnectIfError(getDeleteInstanceRequest(id),
+			containerBrokerModels.CONTAINER_BROKER_QUEUE_NAME,
+			containerBrokerModels.CONTAINER_BROKER_DELETE_ROUTING_KEY)
+	case catalogModels.InstanceStateStartReq, catalogModels.InstanceStateStopReq,
+		catalogModels.InstanceStateReconfiguration:
+		q.sendMessageAndReconnectIfError(getScaleInstanceRequest(id),
+			containerBrokerModels.CONTAINER_BROKER_QUEUE_NAME,
+			containerBrokerModels.CONTAINER_BROKER_SCALE_ROUTING_KEY)
+	default:
+		logger.Debugf("State %q is not supported by Monitor", state)
+	}
+
+}
+
+func (q *QueueManager) sendMessageAndReconnectIfError(request interface{}, queueName, routingKey string) {
+	message, err := json.Marshal(request)
 	if err != nil {
-		logger.Errorf("Failed to prepare CreateInstanceRequest for instance: %s, error: %v", instance.Id, err)
+		logger.Errorf("Failed to prepare request for queue: %s, routingKey: %s", queueName, routingKey)
 		return
 	}
-	q.sendMessageAndReconnectIfError(queueMessage, containerBrokerModels.CONTAINER_BROKER_QUEUE_NAME,
-		containerBrokerModels.CONTAINER_BROKER_CREATE_ROUTING_KEY)
-}
 
-func (q *QueueManager) sendToQueueBrokerDelete(instance catalogModels.Instance) {
-	queueMessage, err := prepareDeleteInstanceRequest(instance)
-	if err != nil {
-		logger.Errorf("Failed to prepare DeleteRequest for instance: %s, error: %v", instance.Id, err)
-		return
-	}
-	q.sendMessageAndReconnectIfError(queueMessage, containerBrokerModels.CONTAINER_BROKER_QUEUE_NAME,
-		containerBrokerModels.CONTAINER_BROKER_DELETE_ROUTING_KEY)
-}
-
-func (q *QueueManager) sendToQueueScale(instance catalogModels.Instance) {
-	queueMessage, err := prepareScaleInstanceRequest(instance)
-	if err != nil {
-		logger.Errorf("Failed to prepare ScaleRequest for instance: %s, error: %v", instance.Id, err)
-		return
-	}
-	q.sendMessageAndReconnectIfError(queueMessage, containerBrokerModels.CONTAINER_BROKER_QUEUE_NAME,
-		containerBrokerModels.CONTAINER_BROKER_SCALE_ROUTING_KEY)
-}
-
-func (q *QueueManager) sendToQueueImageFactoryBuild(image catalogModels.Image) {
-	queueMessage, err := prepareBuildImageRequest(image)
-	if err != nil {
-		logger.Errorf("Failed to prepare BuildImagePostRequest for image: %s, error: %v", image.Id, err)
-		return
-	}
-	q.sendMessageAndReconnectIfError(queueMessage, imageFactoryModels.IMAGE_FACTORY_QUEUE_NAME,
-		imageFactoryModels.IMAGE_FACTORY_IMAGE_ROUTING_KEY)
-}
-
-func (q *QueueManager) sendMessageAndReconnectIfError(message []byte, queueName, routingKey string) {
 	if err := queue.SendMessageToQueue(q.Channel, message, queueName, routingKey); err != nil {
 		logger.Errorf("Can't send message on queue - err: %v! Trying to reconnect...", err)
 		channel, conn := setupQueueConnection()
@@ -414,15 +414,4 @@ func (q *QueueManager) sendMessageAndReconnectIfError(message []byte, queueName,
 			logger.Fatalf("Can't send message on queue! err: %v", err)
 		}
 	}
-}
-
-// this method supposed to call directly to ETCD (using long pool) for check if specific instance status will change in e.g. next 10 minutes
-// if this happen then we can stop observing isntnace in othercase we should try X more times
-func isInstanceIdInArray(instanceIds []string, wantedInstanceId string) bool {
-	for _, instanceId := range instanceIds {
-		if instanceId == wantedInstanceId {
-			return true
-		}
-	}
-	return false
 }

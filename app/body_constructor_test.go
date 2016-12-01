@@ -22,7 +22,6 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 	catalogModels "github.com/trustedanalytics/tap-catalog/models"
 	containerBrokerModels "github.com/trustedanalytics/tap-container-broker/models"
-	"github.com/trustedanalytics/tap-go-common/util"
 	imageFactoryModels "github.com/trustedanalytics/tap-image-factory/models"
 )
 
@@ -74,12 +73,11 @@ func TestGetCreateInstanceRequest(t *testing.T) {
 
 func TestGetDeleteInstanceRequest(t *testing.T) {
 	Convey("getDeleteInstanceRequest should return proper response", t, func() {
-		testInstance := getTestInstance()
 		properResponse := containerBrokerModels.DeleteRequest{
 			Id: testInstanceID,
 		}
 
-		actualResponse := getDeleteInstanceRequest(testInstance)
+		actualResponse := getDeleteInstanceRequest(testInstanceID)
 
 		So(actualResponse, ShouldResemble, properResponse)
 	})
@@ -87,58 +85,12 @@ func TestGetDeleteInstanceRequest(t *testing.T) {
 
 func TestGetBuildImagePostRequest(t *testing.T) {
 	Convey("getBuildImagePostRequest should return proper response", t, func() {
-		testImagePost := getTestImage()
 		properResponse := imageFactoryModels.BuildImagePostRequest{
 			ImageId: testImageID,
 		}
 
-		actualResponse := getBuildImagePostRequest(testImagePost)
+		actualResponse := getBuildImagePostRequest(testImageID)
 
 		So(actualResponse, ShouldResemble, properResponse)
-	})
-}
-
-func TestPrepareCreateInstanceRequest(t *testing.T) {
-	Convey("prepareCreateInstanceRequest should return proper response", t, func() {
-		testInstance := getTestInstance()
-		properResponseRequest := getCreateInstanceRequest(testInstance)
-
-		bytes, err := prepareCreateInstanceRequest(testInstance)
-
-		So(err, ShouldBeNil)
-		actualResponseRequest := containerBrokerModels.CreateInstanceRequest{}
-		err = util.ReadJsonFromByte(bytes, &actualResponseRequest)
-		So(err, ShouldBeNil)
-		So(actualResponseRequest, ShouldResemble, properResponseRequest)
-	})
-}
-
-func TestPrepareDeleteInstanceRequest(t *testing.T) {
-	Convey("prepareDeleteInstanceRequest should return proper response", t, func() {
-		testInstance := getTestInstance()
-		properResponseRequest := getDeleteInstanceRequest(testInstance)
-
-		bytes, err := prepareDeleteInstanceRequest(testInstance)
-
-		So(err, ShouldBeNil)
-		actualResponseRequest := containerBrokerModels.DeleteRequest{}
-		err = util.ReadJsonFromByte(bytes, &actualResponseRequest)
-		So(err, ShouldBeNil)
-		So(actualResponseRequest, ShouldResemble, properResponseRequest)
-	})
-}
-
-func TestPrepareBuildImageRequest(t *testing.T) {
-	Convey("prepareBuildImageRequest should return proper response", t, func() {
-		testImage := getTestImage()
-		properResponseRequest := getBuildImagePostRequest(testImage)
-
-		bytes, err := prepareBuildImageRequest(testImage)
-
-		So(err, ShouldBeNil)
-		actualResponseRequest := imageFactoryModels.BuildImagePostRequest{}
-		err = util.ReadJsonFromByte(bytes, &actualResponseRequest)
-		So(err, ShouldBeNil)
-		So(actualResponseRequest, ShouldResemble, properResponseRequest)
 	})
 }
