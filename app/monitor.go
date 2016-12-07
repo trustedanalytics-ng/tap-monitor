@@ -74,11 +74,8 @@ func StartMonitor(waitGroup *sync.WaitGroup) {
 func monitoringLoop(queueManager *QueueManager, k8SAndCatalogSyncer *synchronization.K8SAndCatalogSyncer) {
 	catalogAndK8sSyncerTicker := time.NewTicker(catalogInstancesAndK8SCheckInternal)
 
-	go queueManager.MonitorCatalogInstances(catalogModels.WatchFromNow)
-	go queueManager.MonitorCatalogImages(catalogModels.WatchFromNow)
-
-	queueManager.CheckAndApplyActionForAllInstances()
-	queueManager.CheckAndApplyActionForAllImages()
+	go queueManager.StartMonitoringCatalogInstances(catalogModels.WatchFromNow)
+	go queueManager.StartMonitoringCatalogImages(catalogModels.WatchFromNow)
 
 	for {
 		select {
@@ -132,17 +129,26 @@ func (q *QueueManager) CheckAndApplyActionForAllInstances() {
 	}
 }
 
+func (q *QueueManager) StartMonitoringCatalogImages(afterIndex uint64) {
+	go q.MonitorCatalogImages(catalogModels.WatchFromNow)
+	q.CheckAndApplyActionForAllInstances()
+}
+
 func (q *QueueManager) MonitorCatalogImages(afterIndex uint64) {
-	select {
-	case <-util.GetTerminationObserverChannel():
-		return
-	default:
-		for {
+	monitorImagesSyncTicker := time.NewTicker(time.Millisecond)
+	defer monitorImagesSyncTicker.Stop()
+
+	for {
+		select {
+		case <-util.GetTerminationObserverChannel():
+			return
+		case <-monitorImagesSyncTicker.C:
 			stateChange, _, err := config.CatalogApi.WatchImages(afterIndex)
 			if err != nil {
-				logger.Error("WatchImages error:", err)
+				logger.Error("WatchImages error, start monitoring from beginning, cause: ", err)
 				time.Sleep(checkAfterErrorIntervalSec)
-				continue
+				go q.StartMonitoringCatalogImages(catalogModels.WatchFromNow)
+				return
 			}
 			q.applyActionForImage(stateChange.Id, stateChange.State)
 			afterIndex = stateChange.Index
@@ -354,17 +360,26 @@ func getImageAddress(id string) string {
 	return dockerHubAddress + "/" + id
 }
 
+func (q *QueueManager) StartMonitoringCatalogInstances(afterIndex uint64) {
+	go q.MonitorCatalogInstances(catalogModels.WatchFromNow)
+	q.CheckAndApplyActionForAllInstances()
+}
+
 func (q *QueueManager) MonitorCatalogInstances(afterIndex uint64) {
-	select {
-	case <-util.GetTerminationObserverChannel():
-		return
-	default:
-		for {
+	monitorInstancesSyncTicker := time.NewTicker(time.Millisecond)
+	defer monitorInstancesSyncTicker.Stop()
+
+	for {
+		select {
+		case <-util.GetTerminationObserverChannel():
+			return
+		case <-monitorInstancesSyncTicker.C:
 			stateChange, _, err := config.CatalogApi.WatchInstances(afterIndex)
 			if err != nil {
-				logger.Error("WatchInstances error:", err)
+				logger.Error("WatchInstances error, start monitoring from beginning, cause: ", err)
 				time.Sleep(checkAfterErrorIntervalSec)
-				continue
+				go q.StartMonitoringCatalogInstances(catalogModels.WatchFromNow)
+				return
 			}
 			q.applyActionForInstance(stateChange.Id, stateChange.State)
 			afterIndex = stateChange.Index

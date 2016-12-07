@@ -7,7 +7,7 @@ import (
 
 const (
 	someId               = "someId"
-	baseTestRetryTimeout = 10 * time.Millisecond
+	baseTestRetryTimeout = 100 * time.Millisecond
 	maxTestValidityTime  = 8 * baseTestRetryTimeout
 )
 

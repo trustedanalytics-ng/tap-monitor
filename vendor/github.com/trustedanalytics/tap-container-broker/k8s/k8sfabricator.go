@@ -78,6 +78,7 @@ type KubernetesApi interface {
 	GetJobsByInstanceId(instanceId string) (*batch.JobList, error)
 	DeleteJob(jobName string) error
 	GetPod(name string) (*api.Pod, error)
+	GetPodsBySpecifiedSelector(labelKey, labelValue string) (*api.PodList, error)
 	CreatePod(pod api.Pod) error
 	DeletePod(podName string) error
 	GetSpecificPodLogs(pod api.Pod) (map[string]string, error)
@@ -701,6 +702,26 @@ func (k *K8Fabricator) GetPod(name string) (*api.Pod, error) {
 		return &api.Pod{}, err
 	}
 	return result, nil
+}
+
+func (k *K8Fabricator) GetPodsBySpecifiedSelector(labelKey, labelValue string) (*api.PodList, error) {
+	selector, err := getCustomSelector(labelKey, labelValue)
+	result, err := k.client.Pods(api.NamespaceDefault).List(api.ListOptions{
+		LabelSelector: selector,
+	})
+	if err != nil {
+		return &api.PodList{}, err
+	}
+	return result, nil
+}
+
+func getCustomSelector(labelKey, labelValue string) (labels.Selector, error) {
+	selector := labels.NewSelector()
+	managedByReq, err := labels.NewRequirement(labelKey, labels.EqualsOperator, sets.NewString(labelValue))
+	if err != nil {
+		return selector, err
+	}
+	return selector.Add(*managedByReq), nil
 }
 
 func (k *K8Fabricator) CreatePod(pod api.Pod) error {
