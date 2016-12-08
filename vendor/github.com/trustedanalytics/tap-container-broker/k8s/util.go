@@ -16,6 +16,7 @@
 package k8s
 
 import (
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -36,4 +37,28 @@ func getCephImageSize() uint64 {
 		return size
 	}
 	return defaultCephImageSizeMB
+}
+
+func addProtocolToHost(annotations map[string]string, host string) string {
+	protocol := "http"
+
+	if val, ok := annotations[useExternalSslFlag]; ok {
+		useSsl, err := strconv.ParseBool(val)
+		if err != nil {
+			logger.Warningf("%s Ingress annotation can not be parsed! Default http protocol will be used! Cause: %v", useExternalSslFlag, err)
+		} else if useSsl {
+			protocol = "https"
+		}
+	}
+
+	parsedHost, err := url.Parse(host)
+	if err != nil {
+		logger.Errorf("Cannot pars host: %s - unchanged value will be returned", host)
+		return host
+	}
+
+	if parsedHost.Scheme == "" {
+		parsedHost.Scheme = protocol
+	}
+	return parsedHost.String()
 }

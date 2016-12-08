@@ -208,6 +208,7 @@ func ExecuteFlowForUserDefinedApp(imageId string) error {
 				CreatedBy:    application.AuditTrail.CreatedBy,
 			},
 		}
+		instance.Metadata = append(instance.Metadata, application.Metadata...)
 
 		if _, _, err = config.CatalogApi.AddApplicationInstance(application.Id, instance); err != nil {
 			logger.Errorf("Failed to call AddApplicationInstance for image: %s - err: %v", imageId, err)

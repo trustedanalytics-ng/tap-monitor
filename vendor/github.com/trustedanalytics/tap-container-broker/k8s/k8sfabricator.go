@@ -36,13 +36,15 @@ import (
 )
 
 const (
-	NotFound string = "not found"
+	NotFound      string = "not found"
+	AlreadyExists string = "already exists"
 
 	InstanceIdLabel string = "instance_id"
 	managedByLabel  string = "managed_by"
 	managedByValue  string = "TAP"
 
-	jobName string = "job-name"
+	jobName            string = "job-name"
+	useExternalSslFlag string = "useExternalSsl"
 
 	defaultCephImageSizeMB = 200
 )
@@ -65,6 +67,7 @@ type KubernetesApi interface {
 	DeleteEndpoint(name string) error
 	GetPodsByInstanceId(instanceId string) ([]api.Pod, error)
 	ListDeployments() (*extensions.DeploymentList, error)
+	ListDeploymentsByLabel(labelKey, labelValue string) (*extensions.DeploymentList, error)
 	CreateConfigMap(configMap *api.ConfigMap) error
 	GetConfigMap(name string) (*api.ConfigMap, error)
 	GetSecret(name string) (*api.Secret, error)
@@ -180,7 +183,7 @@ func (k *K8Fabricator) GetFabricatedServicesForAllOrgs() ([]*model.KubernetesCom
 }
 
 func (k *K8Fabricator) GetFabricatedServices(organization string) ([]*model.KubernetesComponent, error) {
-	selector, err := getSelectorForManagedByLabel()
+	selector, err := getSelectorForManagedByLabel(managedByLabel, managedByValue)
 	if err != nil {
 		return nil, err
 	}
@@ -310,7 +313,7 @@ func (k *K8Fabricator) CreateJob(job *batch.Job, instanceId string) error {
 }
 
 func (k *K8Fabricator) GetJobs() (*batch.JobList, error) {
-	selector, err := getSelectorForManagedByLabel()
+	selector, err := getSelectorForManagedByLabel(managedByLabel, managedByValue)
 	if err != nil {
 		return nil, err
 	}
@@ -414,7 +417,8 @@ func (k *K8Fabricator) GetIngressHosts(instanceId string) ([]string, error) {
 
 	for _, ingress := range ingresses.Items {
 		for _, rule := range ingress.Spec.Rules {
-			result = append(result, rule.Host)
+			host := addProtocolToHost(ingress.ObjectMeta.Annotations, rule.Host)
+			result = append(result, host)
 		}
 	}
 	return result, err
@@ -614,7 +618,7 @@ func (k *K8Fabricator) DeleteService(name string) error {
 func (k *K8Fabricator) GetServices() ([]api.Service, error) {
 	response := []api.Service{}
 
-	selector, err := getSelectorForManagedByLabel()
+	selector, err := getSelectorForManagedByLabel(managedByLabel, managedByValue)
 	if err != nil {
 		logger.Error("GetSelectorForManagedByLabel error", err)
 		return response, err
@@ -649,7 +653,16 @@ func (k *K8Fabricator) DeleteEndpoint(name string) error {
 }
 
 func (k *K8Fabricator) ListDeployments() (*extensions.DeploymentList, error) {
-	selector, err := getSelectorForManagedByLabel()
+	selector, err := getSelectorForManagedByLabel(managedByLabel, managedByValue)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewDeploymentControllerManager(k.extensionsClient, k.cephClient).List(selector)
+}
+
+func (k *K8Fabricator) ListDeploymentsByLabel(labelKey, labelValue string) (*extensions.DeploymentList, error) {
+	selector, err := getSelectorForManagedByLabel(labelKey, labelValue)
 	if err != nil {
 		return nil, err
 	}
@@ -802,7 +815,7 @@ func (k *K8Fabricator) GetDeploymentsEnvsByInstanceId(instanceId string) ([]mode
 	}
 
 	// this selector will be use to fetch all secrets/configMaps beacuse we need to find bound envs values
-	selectorAll, err := getSelectorForManagedByLabel()
+	selectorAll, err := getSelectorForManagedByLabel(managedByLabel, managedByValue)
 	if err != nil {
 		return result, err
 	}
@@ -898,9 +911,9 @@ func getSelectorForInstanceIdLabel(instanceId string) (labels.Selector, error) {
 	return selector.Add(*managedByReq, *instanceIdReq), nil
 }
 
-func getSelectorForManagedByLabel() (labels.Selector, error) {
+func getSelectorForManagedByLabel(labelKey, labelValue string) (labels.Selector, error) {
 	selector := labels.NewSelector()
-	managedByReq, err := labels.NewRequirement(managedByLabel, labels.EqualsOperator, sets.NewString(managedByValue))
+	managedByReq, err := labels.NewRequirement(labelKey, labels.EqualsOperator, sets.NewString(labelValue))
 	if err != nil {
 		return selector, err
 	}
