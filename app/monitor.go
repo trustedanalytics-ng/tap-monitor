@@ -267,7 +267,7 @@ func ExecuteFlowForUserDefinedOffering(imageId string) (err error) {
 
 	newTemplate, err = adjustTemplateIdAndImage(templateID, newImageForTemplate, newTemplate)
 	if err != nil {
-		logger.Errorf("cannot adjust template id and image - template id:", templateID)
+		logger.Errorf("cannot adjust template id and image - template id: %s", templateID)
 		return err
 	}
 
@@ -393,7 +393,7 @@ func (q *QueueManager) applyActionForInstance(id, state string) {
 	case catalogModels.InstanceStateRequested:
 		instance, _, err := config.CatalogApi.GetInstance(id)
 		if err != nil {
-			logger.Errorf("Instance with id: %s is not going to be created! GetInstance error:", id, err)
+			logger.Errorf("Instance with id: %s is not going to be created! GetInstance error: %v", id, err)
 		}
 		q.sendMessageAndReconnectIfError(getCreateInstanceRequest(instance),
 			containerBrokerModels.CONTAINER_BROKER_QUEUE_NAME,
