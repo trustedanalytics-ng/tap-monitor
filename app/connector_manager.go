@@ -88,7 +88,7 @@ func getCephBrokerConnector() (*cephBrokerApi.CephBrokerConnector, error) {
 	if err != nil {
 		panic(err.Error())
 	}
-	return cephBrokerApi.NewCephBrokerBasicAuth("http://"+address, username, password)
+	return cephBrokerApi.NewCephBrokerBasicAuth("https://"+address, username, password)
 }
 
 func getTemplateRepositoryConnector() (*templateRepositoryApi.TemplateRepositoryConnector, error) {
