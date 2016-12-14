@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -295,7 +294,7 @@ func (k *K8Fabricator) ScaleDeploymentAndWait(deployment *extensions.Deployment,
 	if _, err := k.extensionsClient.Deployments(api.NamespaceDefault).Update(deployment); err != nil {
 		return err
 	}
-	return wait.PollInfinite(time.Millisecond*100, clientK8s.DeploymentHasDesiredReplicas(k.extensionsClient, deployment))
+	return wait.PollImmediate(models.ProcessorsIntervalSec, models.ProcessorsTotalDuration, clientK8s.DeploymentHasDesiredReplicas(k.extensionsClient, deployment))
 }
 
 func (k *K8Fabricator) UpdateDeployment(deployment *extensions.Deployment) (*extensions.Deployment, error) {

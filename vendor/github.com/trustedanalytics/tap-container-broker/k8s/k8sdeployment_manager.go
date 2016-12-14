@@ -16,13 +16,14 @@
 package k8s
 
 import (
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	clientK8s "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/trustedanalytics/tap-ceph-broker/client"
+	"github.com/trustedanalytics/tap-container-broker/models"
 )
 
 type DeploymentManager interface {
@@ -72,17 +73,18 @@ func (r *DeploymentConnector) DeleteAll(selector labels.Selector) error {
 }
 
 func (r *DeploymentConnector) UpdateReplicasNumber(name string, count int) error {
-	logger.Info(fmt.Sprintf("Set replicas to %d. Deployment name: %s", count, name))
-	deploymnet, err := r.client.Deployments(api.NamespaceDefault).Get(name)
+	logger.Infof("Set replicas to %d. Deployment name: %s", count, name)
+	deployment, err := r.client.Deployments(api.NamespaceDefault).Get(name)
 	if err != nil {
 		return err
 	}
-	deploymnet.Spec.Replicas = int32(count)
-	if _, err = r.client.Deployments(api.NamespaceDefault).Update(deploymnet); err != nil {
+
+	deployment.Spec.Replicas = int32(count)
+	if _, err = r.client.Deployments(api.NamespaceDefault).Update(deployment); err != nil {
 		return err
 	}
 
-	return nil
+	return wait.PollImmediate(models.ProcessorsIntervalSec, models.ProcessorsTotalDuration, clientK8s.DeploymentHasDesiredReplicas(r.client, deployment))
 }
 
 func (r *DeploymentConnector) Create(deployment *extensions.Deployment) (*extensions.Deployment, error) {

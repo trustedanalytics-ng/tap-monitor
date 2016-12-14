@@ -33,8 +33,8 @@ func TestConvertDependenciesToBindings(t *testing.T) {
 			output []catalogModels.InstanceBindings
 		}{
 			{[]catalogModels.InstanceDependency{{Id: "1"}, {Id: "123456987"}, {Id: "3"}},
-				[]catalogModels.InstanceBindings{{Id: "1", Data: nil}, {Id: "123456987", Data:nil}, {Id: "3", Data:nil}}},
-			{[]catalogModels.InstanceDependency{{Id: "2"}}, []catalogModels.InstanceBindings{{Id: "2", Data:nil}}},
+				[]catalogModels.InstanceBindings{{Id: "1", Data: nil}, {Id: "123456987", Data: nil}, {Id: "3", Data: nil}}},
+			{[]catalogModels.InstanceDependency{{Id: "2"}}, []catalogModels.InstanceBindings{{Id: "2", Data: nil}}},
 			{[]catalogModels.InstanceDependency{}, []catalogModels.InstanceBindings{}},
 		}
 
