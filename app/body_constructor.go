@@ -25,8 +25,6 @@ import (
 func getCreateInstanceRequest(instance catalogModels.Instance) containerBrokerModels.CreateInstanceRequest {
 	return containerBrokerModels.CreateInstanceRequest{
 		InstanceId: instance.Id,
-		TemplateId: catalogModels.GetValueFromMetadata(instance.Metadata, catalogModels.BROKER_TEMPLATE_ID),
-		Image:      catalogModels.GetValueFromMetadata(instance.Metadata, catalogModels.APPLICATION_IMAGE_ADDRESS),
 	}
 }
 

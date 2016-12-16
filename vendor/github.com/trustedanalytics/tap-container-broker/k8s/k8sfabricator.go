@@ -49,9 +49,9 @@ const (
 )
 
 type KubernetesApi interface {
-	FabricateService(instanceId string, parameters map[string]string, component *model.KubernetesComponent) error
-	GetFabricatedServicesForAllOrgs() ([]*model.KubernetesComponent, error)
-	GetFabricatedServices(organization string) ([]*model.KubernetesComponent, error)
+	FabricateComponents(instanceId string, shouldOverwriteEnvs bool, parameters map[string]string, component *model.KubernetesComponent) error
+	GetFabricatedComponentsForAllOrgs() ([]*model.KubernetesComponent, error)
+	GetFabricatedComponents(organization string) ([]*model.KubernetesComponent, error)
 	DeleteAllByInstanceId(instanceId string) error
 	DeleteAllPersistentVolumeClaims() error
 	GetAllPersistentVolumes() ([]api.PersistentVolume, error)
@@ -118,7 +118,7 @@ func GetNewK8FabricatorInstance(creds K8sClusterCredentials, cephClient client.C
 	return &result, err
 }
 
-func (k *K8Fabricator) FabricateService(instanceId string, parameters map[string]string, component *model.KubernetesComponent) error {
+func (k *K8Fabricator) FabricateComponents(instanceId string, shouldOverwriteEnvs bool, parameters map[string]string, component *model.KubernetesComponent) error {
 	extraEnvironments := []api.EnvVar{{Name: "TAP_K8S", Value: "true"}}
 	for key, value := range parameters {
 		extraUserParam := api.EnvVar{
@@ -155,7 +155,13 @@ func (k *K8Fabricator) FabricateService(instanceId string, parameters map[string
 
 	for _, deployment := range component.Deployments {
 		for i, container := range deployment.Spec.Template.Spec.Containers {
-			deployment.Spec.Template.Spec.Containers[i].Env = append(container.Env, extraEnvironments...)
+			var updatedEnvVars []api.EnvVar
+			if shouldOverwriteEnvs {
+				updatedEnvVars = appendSourceEnvsToDestinationEnvsIfNotContained(container.Env, extraEnvironments)
+			} else {
+				updatedEnvVars = appendSourceEnvsToDestinationEnvsIfNotContained(extraEnvironments, container.Env)
+			}
+			deployment.Spec.Template.Spec.Containers[i].Env = updatedEnvVars
 		}
 
 		if err := processDeploymentVolumes(*deployment, k.cephClient, true); err != nil {
@@ -176,12 +182,12 @@ func (k *K8Fabricator) FabricateService(instanceId string, parameters map[string
 	return nil
 }
 
-func (k *K8Fabricator) GetFabricatedServicesForAllOrgs() ([]*model.KubernetesComponent, error) {
+func (k *K8Fabricator) GetFabricatedComponentsForAllOrgs() ([]*model.KubernetesComponent, error) {
 	// TODO: iterate over all organizations here
-	return k.GetFabricatedServices(api.NamespaceDefault)
+	return k.GetFabricatedComponents(api.NamespaceDefault)
 }
 
-func (k *K8Fabricator) GetFabricatedServices(organization string) ([]*model.KubernetesComponent, error) {
+func (k *K8Fabricator) GetFabricatedComponents(organization string) ([]*model.KubernetesComponent, error) {
 	selector, err := getSelectorForManagedByLabel(managedByLabel, managedByValue)
 	if err != nil {
 		return nil, err

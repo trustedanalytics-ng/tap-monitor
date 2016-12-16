@@ -160,7 +160,7 @@ func (s *K8SAndCatalogSyncer) getInstancesExecutableOnK8S() ([]*models.Instance,
 }
 
 func (s *K8SAndCatalogSyncer) getK8SObjectsCreatedByTAP() ([]*K8SObject, error) {
-	kubernetesComponents, err := s.k8s.GetFabricatedServicesForAllOrgs()
+	kubernetesComponents, err := s.k8s.GetFabricatedComponentsForAllOrgs()
 	if err != nil {
 		return nil, err
 	}

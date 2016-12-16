@@ -20,6 +20,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"k8s.io/kubernetes/pkg/api"
 )
 
 func ConvertToProperEnvName(key string) string {
@@ -61,4 +63,23 @@ func addProtocolToHost(annotations map[string]string, host string) string {
 		parsedHost.Scheme = protocol
 	}
 	return parsedHost.String()
+}
+
+func appendSourceEnvsToDestinationEnvsIfNotContained(sourceEnvVars, destinationEnvVars []api.EnvVar) []api.EnvVar {
+	result := destinationEnvVars
+	for _, sourceEnvVar := range sourceEnvVars {
+		if !isEnvContained(sourceEnvVar.Name, destinationEnvVars) {
+			result = append(result, sourceEnvVar)
+		}
+	}
+	return result
+}
+
+func isEnvContained(keyName string, envs []api.EnvVar) bool {
+	for _, envVar := range envs {
+		if keyName == envVar.Name {
+			return true
+		}
+	}
+	return false
 }

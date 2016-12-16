@@ -61,8 +61,6 @@ func TestGetCreateInstanceRequest(t *testing.T) {
 		testInstance := getTestInstance()
 		properResponse := containerBrokerModels.CreateInstanceRequest{
 			InstanceId: testInstanceID,
-			TemplateId: testBrokerTemplateID,
-			Image:      testApplicationImageAddress,
 		}
 
 		actualResponse := getCreateInstanceRequest(testInstance)

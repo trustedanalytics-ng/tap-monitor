@@ -165,16 +165,16 @@
 			"revisionTime": "2016-10-07T12:31:08Z"
 		},
 		{
-			"checksumSHA1": "OfpVIyhfHxdvb5skTHVNlyWA/lA=",
+			"checksumSHA1": "YfdExCgpL3cW4bpUtRNhZ3tNq1o=",
 			"path": "github.com/trustedanalytics/tap-container-broker/k8s",
-			"revision": "784873ca1cd8307c2c45d1e6bef8cc41795d4ea3",
-			"revisionTime": "2016-12-13T08:14:00Z"
+			"revision": "cb24a522f6462a2c75ac0b8e6e3ccddd5132fa28",
+			"revisionTime": "2016-12-16T10:49:19Z"
 		},
 		{
-			"checksumSHA1": "LZfJZdp4k3FIIR2H5b3l98bEw0w=",
+			"checksumSHA1": "2nxmWY0ulvOnZHePf0Qyv/cdZU8=",
 			"path": "github.com/trustedanalytics/tap-container-broker/models",
-			"revision": "784873ca1cd8307c2c45d1e6bef8cc41795d4ea3",
-			"revisionTime": "2016-12-13T08:14:00Z"
+			"revision": "cb24a522f6462a2c75ac0b8e6e3ccddd5132fa28",
+			"revisionTime": "2016-12-16T10:49:19Z"
 		},
 		{
 			"checksumSHA1": "L81qiPel0kcIJpI+p0LawjeFXSU=",
@@ -207,22 +207,22 @@
 			"revisionTime": "2016-10-26T08:05:24Z"
 		},
 		{
-			"checksumSHA1": "PEejpENWjg5LOuzh2u60afoddxE=",
+			"checksumSHA1": "JSLkegD8krROgwTKDa5GgojKCeA=",
 			"path": "github.com/trustedanalytics/tap-monitor",
-			"revision": "4fed556cbcbbbe4ad898517c1ecca9fdf932e292",
-			"revisionTime": "2016-12-13T11:47:54Z"
+			"revision": "bdc1bd5bb77ad8ceb9703a5cb087fca928381169",
+			"revisionTime": "2016-12-15T09:35:56Z"
 		},
 		{
-			"checksumSHA1": "x/lk6CpZX/F7aoi1KHswYeAZwjM=",
+			"checksumSHA1": "7gWD9qxljVnxrpZopJR3qzBZxdU=",
 			"path": "github.com/trustedanalytics/tap-monitor/app",
-			"revision": "4fed556cbcbbbe4ad898517c1ecca9fdf932e292",
-			"revisionTime": "2016-12-13T11:47:54Z"
+			"revision": "bdc1bd5bb77ad8ceb9703a5cb087fca928381169",
+			"revisionTime": "2016-12-15T09:35:56Z"
 		},
 		{
 			"checksumSHA1": "jUB7jIvjcHAfk+hcx0+EG7xP2QA=",
 			"path": "github.com/trustedanalytics/tap-monitor/app/synchronization",
-			"revision": "4fed556cbcbbbe4ad898517c1ecca9fdf932e292",
-			"revisionTime": "2016-12-13T11:47:54Z"
+			"revision": "bdc1bd5bb77ad8ceb9703a5cb087fca928381169",
+			"revisionTime": "2016-12-15T09:35:56Z"
 		},
 		{
 			"checksumSHA1": "s85rImmmwYtBVkisf7kYRBV9x5k=",

@@ -21,8 +21,8 @@ import "time"
 var (
 	ProcessorsIntervalSec time.Duration = 10 * time.Second
 
-	ProcessorsTries  = 60
-	WaitForDepsTries = ProcessorsTries * 2
+	ProcessorsTries  = 12
+	WaitForDepsTries = ProcessorsTries + 2
 
 	ProcessorsTotalDuration time.Duration = ProcessorsIntervalSec * time.Duration(ProcessorsTries)
 )
