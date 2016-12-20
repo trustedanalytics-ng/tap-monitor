@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/trustedanalytics/tap-catalog/builder"
 	catalogModels "github.com/trustedanalytics/tap-catalog/models"
 	templateRepositoryModels "github.com/trustedanalytics/tap-template-repository/model"
 )
@@ -167,47 +168,21 @@ func adjustTemplateIdAndImage(templateID, image string, rawTemplate templateRepo
 }
 
 func UpdateTemplate(serviceId string, keyNameToUpdate string, oldVal interface{}, newVal interface{}) (catalogModels.Template, int, error) {
-	marshaledOldStateValue, err := json.Marshal(oldVal)
+	patch, err := builder.MakePatchWithPreviousValue(keyNameToUpdate, oldVal, newVal, catalogModels.OperationUpdate)
 	if err != nil {
-		logger.Errorf("cannot marshal value %s", oldVal)
 		return catalogModels.Template{}, http.StatusBadRequest, err
 	}
 
-	marshaledNewStateValue, err := json.Marshal(newVal)
-	if err != nil {
-		logger.Errorf("cannot marshal value %s", oldVal)
-		return catalogModels.Template{}, http.StatusBadRequest, err
-	}
-
-	patches := []catalogModels.Patch{{
-		Operation: catalogModels.OperationUpdate,
-		Field:     keyNameToUpdate,
-		Value:     marshaledNewStateValue,
-		PrevValue: marshaledOldStateValue,
-	}}
-	return config.CatalogApi.UpdateTemplate(serviceId, patches)
+	return config.CatalogApi.UpdateTemplate(serviceId, []catalogModels.Patch{patch})
 }
 
 func UpdateOffering(serviceId string, keyNameToUpdate string, oldVal interface{}, newVal interface{}) (catalogModels.Service, int, error) {
-	marshaledOldStateValue, err := json.Marshal(oldVal)
+	patch, err := builder.MakePatchWithPreviousValue(keyNameToUpdate, oldVal, newVal, catalogModels.OperationUpdate)
 	if err != nil {
-		logger.Errorf("cannot marshal value %s", oldVal)
 		return catalogModels.Service{}, http.StatusBadRequest, err
 	}
 
-	marshaledNewStateValue, err := json.Marshal(newVal)
-	if err != nil {
-		logger.Errorf("cannot marshal value %s", oldVal)
-		return catalogModels.Service{}, http.StatusBadRequest, err
-	}
-
-	patches := []catalogModels.Patch{{
-		Operation: catalogModels.OperationUpdate,
-		Field:     keyNameToUpdate,
-		Value:     marshaledNewStateValue,
-		PrevValue: marshaledOldStateValue,
-	}}
-	return config.CatalogApi.UpdateService(serviceId, patches)
+	return config.CatalogApi.UpdateService(serviceId, []catalogModels.Patch{patch})
 }
 
 func getImageAddress(id string) string {

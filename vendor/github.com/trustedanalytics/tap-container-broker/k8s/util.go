@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 func ConvertToProperEnvName(key string) string {
@@ -82,4 +83,13 @@ func isEnvContained(keyName string, envs []api.EnvVar) bool {
 		}
 	}
 	return false
+}
+
+func FetchHostsFromIngress(ingress extensions.Ingress) []string {
+	result := make([]string, len(ingress.Spec.Rules))
+	for i, rule := range ingress.Spec.Rules {
+		host := addProtocolToHost(ingress.ObjectMeta.Annotations, rule.Host)
+		result[i] = host
+	}
+	return result
 }

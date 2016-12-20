@@ -89,7 +89,7 @@ func fakeGetConnectionParametersFromEnv(componentName string) (string, string, s
 	return fmt.Sprintf("%s:%s", host, port), user, pass, nil
 }
 
-func fakeNewTapCatalogAPIWithBasicAuth(address, username, password string) (*catalogApi.TapCatalogApiConnector, error) {
+func fakeNewTapCatalogAPIWithBasicAuth(address, username, password string) (catalogApi.TapCatalogApi, error) {
 	return &catalogApi.TapCatalogApiConnector{Address: address, Username: username, Password: password, Client: &http.Client{}}, nil
 }
 
@@ -128,22 +128,10 @@ func TestGetCatalogConnector(t *testing.T) {
 	prepareTestingEnvironment(t)
 
 	Convey("getCatalogConnector should return proper response", t, func() {
-		connector, err := getCatalogConnector()
+		_, err := getCatalogConnector()
 
 		Convey("Error should be nil", func() {
 			So(err, ShouldBeNil)
-		})
-		Convey("Address should be proper", func() {
-			So(connector.Address, ShouldEqual, fmt.Sprintf("https://%s:%s", catalogHost, catalogPort))
-		})
-		Convey("Catalog should be proper", func() {
-			So(connector.Username, ShouldEqual, catalogUser)
-		})
-		Convey("Password should be proper", func() {
-			So(connector.Password, ShouldEqual, catalogPassword)
-		})
-		Convey("Client should not be nil", func() {
-			So(connector.Client, ShouldNotBeNil)
 		})
 	})
 }

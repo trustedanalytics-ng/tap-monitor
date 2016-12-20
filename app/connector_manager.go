@@ -75,7 +75,7 @@ func InitConnections() error {
 	return nil
 }
 
-func getCatalogConnector() (*catalogApi.TapCatalogApiConnector, error) {
+func getCatalogConnector() (catalogApi.TapCatalogApi, error) {
 	address, username, password, err := getConnectionParametersFromEnv("CATALOG")
 	if err != nil {
 		panic(err.Error())

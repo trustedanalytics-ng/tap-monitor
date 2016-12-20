@@ -421,10 +421,7 @@ func (k *K8Fabricator) GetIngressHosts(instanceId string) ([]string, error) {
 	}
 
 	for _, ingress := range ingresses.Items {
-		for _, rule := range ingress.Spec.Rules {
-			host := addProtocolToHost(ingress.ObjectMeta.Annotations, rule.Host)
-			result = append(result, host)
-		}
+		result = append(result, FetchHostsFromIngress(ingress)...)
 	}
 	return result, err
 }
