@@ -75,18 +75,17 @@ func MakePatch(field string, newValue interface{}, operation models.PatchOperati
 		Operation: operation,
 		Field:     &field,
 		Value:     (*json.RawMessage)(&newValueByte),
-
 	}
 	return patch, nil
 }
 
-func MakePatchWithPreviousValue(field string, valueToUpdate interface{}, currentValue interface{}, operation models.PatchOperation) (models.Patch, error) {
-	patch, err := MakePatch(field, valueToUpdate, operation)
+func MakePatchWithPreviousValue(field string, newValue interface{}, oldValue interface{}, operation models.PatchOperation) (models.Patch, error) {
+	patch, err := MakePatch(field, newValue, operation)
 	if err != nil {
 		return patch, err
 	}
 
-	currentValueByte, err := json.Marshal(currentValue)
+	currentValueByte, err := json.Marshal(oldValue)
 	if err != nil {
 		logger.Errorf("marshal field current value %s error: %v", field, err)
 		return models.Patch{}, err

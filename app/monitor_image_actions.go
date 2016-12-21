@@ -168,7 +168,7 @@ func adjustTemplateIdAndImage(templateID, image string, rawTemplate templateRepo
 }
 
 func UpdateTemplate(serviceId string, keyNameToUpdate string, oldVal interface{}, newVal interface{}) (catalogModels.Template, int, error) {
-	patch, err := builder.MakePatchWithPreviousValue(keyNameToUpdate, oldVal, newVal, catalogModels.OperationUpdate)
+	patch, err := builder.MakePatchWithPreviousValue(keyNameToUpdate, newVal, oldVal, catalogModels.OperationUpdate)
 	if err != nil {
 		return catalogModels.Template{}, http.StatusBadRequest, err
 	}
@@ -177,7 +177,7 @@ func UpdateTemplate(serviceId string, keyNameToUpdate string, oldVal interface{}
 }
 
 func UpdateOffering(serviceId string, keyNameToUpdate string, oldVal interface{}, newVal interface{}) (catalogModels.Service, int, error) {
-	patch, err := builder.MakePatchWithPreviousValue(keyNameToUpdate, oldVal, newVal, catalogModels.OperationUpdate)
+	patch, err := builder.MakePatchWithPreviousValue(keyNameToUpdate, newVal, oldVal, catalogModels.OperationUpdate)
 	if err != nil {
 		return catalogModels.Service{}, http.StatusBadRequest, err
 	}
