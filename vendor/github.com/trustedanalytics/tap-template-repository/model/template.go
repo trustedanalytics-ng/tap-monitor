@@ -42,7 +42,7 @@ type RawTemplate map[string]interface{}
 
 type Template struct {
 	Id    string                `json:"id"`
-	Body  KubernetesComponent   `json:"body"`
+	Body  []KubernetesComponent `json:"body"`
 	Hooks map[HookType]*api.Pod `json:"hooks"`
 }
 
@@ -62,4 +62,13 @@ type KubernetesComponent struct {
 	Services               []*api.Service               `json:"services"`
 	ServiceAccounts        []*api.ServiceAccount        `json:"serviceAccounts"`
 	Secrets                []*api.Secret                `json:"secrets"`
+}
+
+func IsServiceBrokerTemplate(template Template) bool {
+	for _, component := range template.Body {
+		if component.Type == ComponentTypeBroker || component.Type == ComponentTypeBoth {
+			return true
+		}
+	}
+	return false
 }

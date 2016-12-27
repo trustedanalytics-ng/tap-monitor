@@ -23,14 +23,13 @@ import (
 )
 
 const (
-	NotFound      string = "not found"
-	AlreadyExists string = "already exists"
-	NotFoundEtcd  string = "cannnot get key"
-	ConflictCompareEtcd  string = "Compare failed"
-	ConflictError string = "conflict"
-	EmptyField    string = "is empty!"
-	CannotUnmarshal string = "cannot unmarshal"
-	CanNotBeChanged string = "can not be changed!"
+	NotFound            string = "not found"
+	AlreadyExists       string = "already exists"
+	NotFoundEtcd        string = "cannnot get key"
+	ConflictCompareEtcd string = "Compare failed"
+	ConflictError       string = "conflict"
+	EmptyField          string = "is empty!"
+	CannotUnmarshal     string = "cannot unmarshal"
 )
 
 func translateHttpErrorStatus(status int) int {
@@ -44,8 +43,7 @@ func translateHttpErrorStatus(status int) int {
 func IsBadRequestError(err error) bool {
 	return isErrorTypeStringInErrorMessage(EmptyField, err) ||
 		isErrorTypeStringInErrorMessage(ConflictCompareEtcd, err) ||
-		isErrorTypeStringInErrorMessage(CannotUnmarshal, err) ||
-		isErrorTypeStringInErrorMessage(CanNotBeChanged, err)
+		isErrorTypeStringInErrorMessage(CannotUnmarshal, err)
 
 }
 
@@ -92,7 +90,7 @@ func GetHttpStatusOrStatusError(status int, err error) int {
 			return http.StatusNotFound
 		} else if IsAlreadyExistsError(err) || IsConflictError(err) {
 			return http.StatusConflict
-		} else if IsBadRequestError(err){
+		} else if IsBadRequestError(err) {
 			return http.StatusBadRequest
 		}
 		return http.StatusInternalServerError

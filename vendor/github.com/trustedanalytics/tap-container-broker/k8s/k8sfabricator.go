@@ -49,7 +49,7 @@ const (
 )
 
 type KubernetesApi interface {
-	FabricateComponents(instanceId string, shouldOverwriteEnvs bool, parameters map[string]string, component *model.KubernetesComponent) error
+	FabricateComponents(instanceId string, shouldOverwriteEnvs bool, parameters map[string]string, components []model.KubernetesComponent) error
 	GetFabricatedComponentsForAllOrgs() ([]*model.KubernetesComponent, error)
 	GetFabricatedComponents(organization string) ([]*model.KubernetesComponent, error)
 	DeleteAllByInstanceId(instanceId string) error
@@ -118,7 +118,7 @@ func GetNewK8FabricatorInstance(creds K8sClusterCredentials, cephClient client.C
 	return &result, err
 }
 
-func (k *K8Fabricator) FabricateComponents(instanceId string, shouldOverwriteEnvs bool, parameters map[string]string, component *model.KubernetesComponent) error {
+func (k *K8Fabricator) FabricateComponents(instanceId string, shouldOverwriteEnvs bool, parameters map[string]string, components []model.KubernetesComponent) error {
 	extraEnvironments := []api.EnvVar{{Name: "TAP_K8S", Value: "true"}}
 	for key, value := range parameters {
 		extraUserParam := api.EnvVar{
@@ -127,58 +127,59 @@ func (k *K8Fabricator) FabricateComponents(instanceId string, shouldOverwriteEnv
 		}
 		extraEnvironments = append(extraEnvironments, extraUserParam)
 	}
-	logger.Debugf("Intance: %s extra parameters value: %v", instanceId, extraEnvironments)
+	logger.Debugf("Instance: %s extra parameters value: %v", instanceId, extraEnvironments)
 
-	for _, sc := range component.Secrets {
-		if _, err := k.client.Secrets(api.NamespaceDefault).Create(sc); err != nil {
-			return err
-		}
-	}
-
-	for _, claim := range component.PersistentVolumeClaims {
-		if _, err := k.client.PersistentVolumeClaims(api.NamespaceDefault).Create(claim); err != nil {
-			return err
-		}
-	}
-
-	for _, svc := range component.Services {
-		if _, err := k.client.Services(api.NamespaceDefault).Create(svc); err != nil {
-			return err
-		}
-	}
-
-	for _, acc := range component.ServiceAccounts {
-		if _, err := k.client.ServiceAccounts(api.NamespaceDefault).Create(acc); err != nil {
-			return err
-		}
-	}
-
-	for _, deployment := range component.Deployments {
-		for i, container := range deployment.Spec.Template.Spec.Containers {
-			var updatedEnvVars []api.EnvVar
-			if shouldOverwriteEnvs {
-				updatedEnvVars = appendSourceEnvsToDestinationEnvsIfNotContained(container.Env, extraEnvironments)
-			} else {
-				updatedEnvVars = appendSourceEnvsToDestinationEnvsIfNotContained(extraEnvironments, container.Env)
+	for _, component := range components {
+		for _, sc := range component.Secrets {
+			if _, err := k.client.Secrets(api.NamespaceDefault).Create(sc); err != nil {
+				return err
 			}
-			deployment.Spec.Template.Spec.Containers[i].Env = updatedEnvVars
 		}
 
-		if err := processDeploymentVolumes(*deployment, k.cephClient, true); err != nil {
-			return err
+		for _, claim := range component.PersistentVolumeClaims {
+			if _, err := k.client.PersistentVolumeClaims(api.NamespaceDefault).Create(claim); err != nil {
+				return err
+			}
 		}
 
-		if _, err := k.extensionsClient.Deployments(api.NamespaceDefault).Create(deployment); err != nil {
-			return err
+		for _, svc := range component.Services {
+			if _, err := k.client.Services(api.NamespaceDefault).Create(svc); err != nil {
+				return err
+			}
+		}
+
+		for _, acc := range component.ServiceAccounts {
+			if _, err := k.client.ServiceAccounts(api.NamespaceDefault).Create(acc); err != nil {
+				return err
+			}
+		}
+
+		for _, deployment := range component.Deployments {
+			for i, container := range deployment.Spec.Template.Spec.Containers {
+				var updatedEnvVars []api.EnvVar
+				if shouldOverwriteEnvs {
+					updatedEnvVars = appendSourceEnvsToDestinationEnvsIfNotContained(container.Env, extraEnvironments)
+				} else {
+					updatedEnvVars = appendSourceEnvsToDestinationEnvsIfNotContained(extraEnvironments, container.Env)
+				}
+				deployment.Spec.Template.Spec.Containers[i].Env = updatedEnvVars
+			}
+
+			if err := processDeploymentVolumes(*deployment, k.cephClient, true); err != nil {
+				return err
+			}
+
+			if _, err := k.extensionsClient.Deployments(api.NamespaceDefault).Create(deployment); err != nil {
+				return err
+			}
+		}
+
+		for _, ing := range component.Ingresses {
+			if _, err := k.extensionsClient.Ingress(api.NamespaceDefault).Create(ing); err != nil {
+				return err
+			}
 		}
 	}
-
-	for _, ing := range component.Ingresses {
-		if _, err := k.extensionsClient.Ingress(api.NamespaceDefault).Create(ing); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
