@@ -27,6 +27,10 @@ var logger, _ = commonLogger.InitLogger("builder")
 
 // message is optional, if pass then LAST_STATE_CHANGE_REASON key will be added/updated in Instance Metadata
 func MakePatchesForInstanceStateAndLastStateMetadata(message string, currentState, stateToSet models.InstanceState) ([]models.Patch, error) {
+	if stateToSet == models.InstanceStateDestroyReq && currentState == models.InstanceStateFailure {
+		message = models.ReasonDeleteFailure
+	}
+
 	patches, err := makePatchesForStateUpdate(currentState.String(), stateToSet.String())
 	if err != nil {
 		return patches, err
@@ -79,13 +83,13 @@ func MakePatch(field string, newValue interface{}, operation models.PatchOperati
 	return patch, nil
 }
 
-func MakePatchWithPreviousValue(field string, valueToUpdate interface{}, currentValue interface{}, operation models.PatchOperation) (models.Patch, error) {
-	patch, err := MakePatch(field, valueToUpdate, operation)
+func MakePatchWithPreviousValue(field string, newValue interface{}, oldValue interface{}, operation models.PatchOperation) (models.Patch, error) {
+	patch, err := MakePatch(field, newValue, operation)
 	if err != nil {
 		return patch, err
 	}
 
-	currentValueByte, err := json.Marshal(currentValue)
+	currentValueByte, err := json.Marshal(oldValue)
 	if err != nil {
 		logger.Errorf("marshal field current value %s error: %v", field, err)
 		return models.Patch{}, err
