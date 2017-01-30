@@ -27,7 +27,6 @@ import (
 	clientK8s "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/trustedanalytics/tap-ceph-broker/client"
 	"github.com/trustedanalytics/tap-container-broker/models"
@@ -75,7 +74,6 @@ type KubernetesApi interface {
 	GetIngress(name string) (*extensions.Ingress, error)
 	CreateIngress(ingress extensions.Ingress) error
 	DeleteIngress(name string) error
-	UpdateSecret(secret api.Secret) error
 	GetJobs() (*batch.JobList, error)
 	GetJobsByInstanceId(instanceId string) (*batch.JobList, error)
 	DeleteJob(jobName string) error
@@ -87,17 +85,16 @@ type KubernetesApi interface {
 	GetPodsLogs(instanceId string) (map[string]string, error)
 	GetJobLogs(job batch.Job) (map[string]string, error)
 	CreateJob(job *batch.Job, instanceId string) error
-	ScaleDeploymentAndWait(deployment *extensions.Deployment, replicas int) error
-	UpdateDeployment(deployment *extensions.Deployment) (*extensions.Deployment, error)
+	ScaleDeploymentAndWait(deploymentName, instanceId string, replicas int) error
+	UpdateDeployment(instanceId string, prepareFunction models.PrepareDeployment) error
 	GetDeployment(name string) (*extensions.Deployment, error)
 	GetIngressHosts(instanceId string) ([]string, error)
 	GetPodEvents(pod api.Pod) ([]api.Event, error)
 }
 
 type K8Fabricator struct {
-	client           KubernetesClient
-	extensionsClient ExtensionsInterface
-	cephClient       client.CephBroker
+	client     clientK8s.Interface
+	cephClient client.CephBroker
 }
 
 func GetNewK8FabricatorInstance(creds K8sClusterCredentials, cephClient client.CephBroker) (*K8Fabricator, error) {
@@ -107,13 +104,7 @@ func GetNewK8FabricatorInstance(creds K8sClusterCredentials, cephClient client.C
 		return &result, err
 	}
 
-	extensionClient, err := GetNewExtensionsClient(creds)
-	if err != nil {
-		return &result, err
-	}
-
 	result.client = client
-	result.extensionsClient = extensionClient
 	result.cephClient = cephClient
 	return &result, err
 }
@@ -130,6 +121,12 @@ func (k *K8Fabricator) FabricateComponents(instanceId string, shouldOverwriteEnv
 	logger.Debugf("Instance: %s extra parameters value: %v", instanceId, extraEnvironments)
 
 	for _, component := range components {
+		for _, sc := range component.ConfigMaps {
+			if _, err := k.client.ConfigMaps(api.NamespaceDefault).Create(sc); err != nil {
+				return err
+			}
+		}
+
 		for _, sc := range component.Secrets {
 			if _, err := k.client.Secrets(api.NamespaceDefault).Create(sc); err != nil {
 				return err
@@ -165,17 +162,24 @@ func (k *K8Fabricator) FabricateComponents(instanceId string, shouldOverwriteEnv
 				deployment.Spec.Template.Spec.Containers[i].Env = updatedEnvVars
 			}
 
-			if err := processDeploymentVolumes(*deployment, k.cephClient, true); err != nil {
+			cephVolume, err := processDeploymentVolumes(*deployment, k.cephClient, true)
+
+			if err != nil {
 				return err
 			}
 
-			if _, err := k.extensionsClient.Deployments(api.NamespaceDefault).Create(deployment); err != nil {
+			// append only if volume not empty
+			if cephVolume.Name != "" {
+				deployment.Spec.Template.Spec.Volumes = append(deployment.Spec.Template.Spec.Volumes, cephVolume)
+			}
+
+			if _, err := k.client.Extensions().Deployments(api.NamespaceDefault).Create(deployment); err != nil {
 				return err
 			}
 		}
 
 		for _, ing := range component.Ingresses {
-			if _, err := k.extensionsClient.Ingress(api.NamespaceDefault).Create(ing); err != nil {
+			if _, err := k.client.Extensions().Ingress(api.NamespaceDefault).Create(ing); err != nil {
 				return err
 			}
 		}
@@ -201,11 +205,11 @@ func (k *K8Fabricator) GetFabricatedComponents(organization string) ([]*model.Ku
 	if err != nil {
 		return nil, err
 	}
-	deployments, err := k.extensionsClient.Deployments(organization).List(listOptions)
+	deployments, err := k.client.Extensions().Deployments(organization).List(listOptions)
 	if err != nil {
 		return nil, err
 	}
-	ings, err := k.extensionsClient.Ingress(organization).List(listOptions)
+	ings, err := k.client.Extensions().Ingress(organization).List(listOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -221,13 +225,18 @@ func (k *K8Fabricator) GetFabricatedComponents(organization string) ([]*model.Ku
 	if err != nil {
 		return nil, err
 	}
+	configMaps, err := k.client.ConfigMaps(organization).List(listOptions)
+	if err != nil {
+		return nil, err
+	}
 	return groupIntoComponents(
 		pvcs.Items,
 		deployments.Items,
 		ings.Items,
 		svcs.Items,
 		sAccounts.Items,
-		secrets.Items), nil
+		secrets.Items,
+		configMaps.Items), nil
 }
 
 func groupIntoComponents(
@@ -237,6 +246,7 @@ func groupIntoComponents(
 	svcs []api.Service,
 	sAccounts []api.ServiceAccount,
 	secrets []api.Secret,
+	configMaps []api.ConfigMap,
 ) []*model.KubernetesComponent {
 
 	components := make(map[string]*model.KubernetesComponent)
@@ -277,6 +287,12 @@ func groupIntoComponents(
 		component.Secrets = append(component.Secrets, &secret)
 	}
 
+	for i := range configMaps {
+		configMap := configMaps[i]
+		component := ensureAndGetKubernetesComponent(components, configMap.GetLabels())
+		component.ConfigMaps = append(component.ConfigMaps, &configMap)
+	}
+
 	var list []*model.KubernetesComponent
 	for _, component := range components {
 		list = append(list, component)
@@ -296,25 +312,9 @@ func ensureAndGetKubernetesComponent(components map[string]*model.KubernetesComp
 	return component
 }
 
-func (k *K8Fabricator) ScaleDeploymentAndWait(deployment *extensions.Deployment, replicas int) error {
-	deployment.Spec.Replicas = int32(replicas)
-	if _, err := k.extensionsClient.Deployments(api.NamespaceDefault).Update(deployment); err != nil {
-		return err
-	}
-	return wait.PollImmediate(models.ProcessorsIntervalSec, models.ProcessorsTotalDuration, clientK8s.DeploymentHasDesiredReplicas(k.extensionsClient, deployment))
-}
-
-func (k *K8Fabricator) UpdateDeployment(deployment *extensions.Deployment) (*extensions.Deployment, error) {
-	return k.extensionsClient.Deployments(api.NamespaceDefault).Update(deployment)
-}
-
-func (k *K8Fabricator) GetDeployment(name string) (*extensions.Deployment, error) {
-	return k.extensionsClient.Deployments(api.NamespaceDefault).Get(name)
-}
-
 func (k *K8Fabricator) CreateJob(job *batch.Job, instanceId string) error {
 	logger.Debug("Creating Job. InstanceId:", instanceId)
-	_, err := k.extensionsClient.Jobs(api.NamespaceDefault).Create(job)
+	_, err := k.client.Extensions().Jobs(api.NamespaceDefault).Create(job)
 	return err
 }
 
@@ -324,7 +324,7 @@ func (k *K8Fabricator) GetJobs() (*batch.JobList, error) {
 		return nil, err
 	}
 
-	return k.extensionsClient.Jobs(api.NamespaceDefault).List(api.ListOptions{
+	return k.client.Extensions().Jobs(api.NamespaceDefault).List(api.ListOptions{
 		LabelSelector: selector,
 	})
 }
@@ -335,13 +335,13 @@ func (k *K8Fabricator) GetJobsByInstanceId(instanceId string) (*batch.JobList, e
 		return nil, err
 	}
 
-	return k.extensionsClient.Jobs(api.NamespaceDefault).List(api.ListOptions{
+	return k.client.Extensions().Jobs(api.NamespaceDefault).List(api.ListOptions{
 		LabelSelector: selector,
 	})
 }
 
 func (k *K8Fabricator) DeleteJob(jobName string) error {
-	return k.extensionsClient.Jobs(api.NamespaceDefault).Delete(jobName, &api.DeleteOptions{})
+	return k.client.Extensions().Jobs(api.NamespaceDefault).Delete(jobName, &api.DeleteOptions{})
 }
 
 func (k *K8Fabricator) GetJobLogs(job batch.Job) (map[string]string, error) {
@@ -414,7 +414,7 @@ func (k *K8Fabricator) GetIngressHosts(instanceId string) ([]string, error) {
 		return nil, err
 	}
 
-	ingresses, err := k.extensionsClient.Ingress(api.NamespaceDefault).List(api.ListOptions{
+	ingresses, err := k.client.Extensions().Ingress(api.NamespaceDefault).List(api.ListOptions{
 		LabelSelector: ingresSelector,
 	})
 	if err != nil {
@@ -468,7 +468,7 @@ func (k *K8Fabricator) DeleteAllByInstanceId(instanceId string) error {
 		}
 	}
 
-	ings, err := k.extensionsClient.Ingress(api.NamespaceDefault).List(api.ListOptions{
+	ings, err := k.client.Extensions().Ingress(api.NamespaceDefault).List(api.ListOptions{
 		LabelSelector: selector,
 	})
 	if err != nil {
@@ -478,14 +478,14 @@ func (k *K8Fabricator) DeleteAllByInstanceId(instanceId string) error {
 	for _, i := range ings.Items {
 		name = i.ObjectMeta.Name
 		logger.Debug("Delete ingress:", name)
-		err = k.extensionsClient.Ingress(api.NamespaceDefault).Delete(name, &api.DeleteOptions{})
+		err = k.client.Extensions().Ingress(api.NamespaceDefault).Delete(name, &api.DeleteOptions{})
 		if err != nil {
 			logger.Error("Delete ingress failed:", err)
 			return err
 		}
 	}
 
-	if err = NewDeploymentControllerManager(k.extensionsClient, k.cephClient).DeleteAll(selector); err != nil {
+	if err = k.DeleteAllDeployments(instanceId, selector); err != nil {
 		logger.Error("Delete deployment failed:", err)
 		return err
 	}
@@ -503,6 +503,23 @@ func (k *K8Fabricator) DeleteAllByInstanceId(instanceId string) error {
 		err = k.client.Secrets(api.NamespaceDefault).Delete(name)
 		if err != nil {
 			logger.Error("Delete secret failed:", err)
+			return err
+		}
+	}
+
+	configMaps, err := k.client.ConfigMaps(api.NamespaceDefault).List(api.ListOptions{
+		LabelSelector: selector,
+	})
+	if err != nil {
+		logger.Error("List configMaps failed:", err)
+		return err
+	}
+	for _, i := range configMaps.Items {
+		name = i.ObjectMeta.Name
+		logger.Debug("Delete configMap:", name)
+		err = k.client.ConfigMaps(api.NamespaceDefault).Delete(name)
+		if err != nil {
+			logger.Error("Delete configMap failed:", err)
 			return err
 		}
 	}
@@ -655,24 +672,6 @@ func (k *K8Fabricator) DeleteEndpoint(name string) error {
 	return err
 }
 
-func (k *K8Fabricator) ListDeployments() (*extensions.DeploymentList, error) {
-	selector, err := getSelectorForManagedByLabel(managedByLabel, managedByValue)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewDeploymentControllerManager(k.extensionsClient, k.cephClient).List(selector)
-}
-
-func (k *K8Fabricator) ListDeploymentsByLabel(labelKey, labelValue string) (*extensions.DeploymentList, error) {
-	selector, err := getSelectorForManagedByLabel(labelKey, labelValue)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewDeploymentControllerManager(k.extensionsClient, k.cephClient).List(selector)
-}
-
 func (k *K8Fabricator) GetPodsByInstanceId(instanceId string) ([]api.Pod, error) {
 	result := []api.Pod{}
 	selector, err := getSelectorForInstanceIdLabel(instanceId)
@@ -786,13 +785,8 @@ func (k *K8Fabricator) DeleteSecret(name string) error {
 	return err
 }
 
-func (k *K8Fabricator) UpdateSecret(secret api.Secret) error {
-	_, err := k.client.Secrets(api.NamespaceDefault).Update(&secret)
-	return err
-}
-
 func (k *K8Fabricator) GetIngress(name string) (*extensions.Ingress, error) {
-	result, err := k.extensionsClient.Ingress(api.NamespaceDefault).Get(name)
+	result, err := k.client.Extensions().Ingress(api.NamespaceDefault).Get(name)
 	if err != nil {
 		return &extensions.Ingress{}, err
 	}
@@ -800,12 +794,12 @@ func (k *K8Fabricator) GetIngress(name string) (*extensions.Ingress, error) {
 }
 
 func (k *K8Fabricator) CreateIngress(ingress extensions.Ingress) error {
-	_, err := k.extensionsClient.Ingress(api.NamespaceDefault).Create(&ingress)
+	_, err := k.client.Extensions().Ingress(api.NamespaceDefault).Create(&ingress)
 	return err
 }
 
 func (k *K8Fabricator) DeleteIngress(name string) error {
-	err := k.extensionsClient.Ingress(api.NamespaceDefault).Delete(name, nil)
+	err := k.client.Extensions().Ingress(api.NamespaceDefault).Delete(name, nil)
 	return err
 }
 
@@ -823,7 +817,7 @@ func (k *K8Fabricator) GetDeploymentsEnvsByInstanceId(instanceId string) ([]mode
 		return result, err
 	}
 
-	deployments, err := NewDeploymentControllerManager(k.extensionsClient, k.cephClient).List(selector)
+	deployments, err := k.listDeployments(selector)
 	if err != nil {
 		return result, err
 	}

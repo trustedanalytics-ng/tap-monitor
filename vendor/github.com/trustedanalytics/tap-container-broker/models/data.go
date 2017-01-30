@@ -14,3 +14,23 @@
  * limitations under the License.
  */
 
+package models
+
+import (
+	catalogModels "github.com/trustedanalytics/tap-catalog/models"
+	templateRepositoryModel "github.com/trustedanalytics/tap-template-repository/model"
+)
+
+type CatalogEntityWithK8sTemplate struct {
+	Template    *templateRepositoryModel.Template
+	Instance    *catalogModels.Instance
+	Application *catalogModels.Application
+	Service     *catalogModels.Service
+	ServicePlan *catalogModels.ServicePlan
+}
+
+type CatalogEntityWithK8sTemplateRequest struct {
+	InstanceId             string
+	BoundInstanceId        string
+	ApplicationSSLCertHash string
+}

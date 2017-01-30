@@ -64,7 +64,7 @@ func ConsumeMessages(ch *amqp.Channel, handler ConsumeHandlerFunc, queueName str
 		false,         // global
 	)
 	if err != nil {
-		logger.Fatalf("Failed to set qos on queue:", queueName, err)
+		logger.Fatalf("Failed to set qos on queue: %s, %v", queueName, err)
 	}
 
 	messageChannel, err := ch.Consume(
@@ -77,7 +77,7 @@ func ConsumeMessages(ch *amqp.Channel, handler ConsumeHandlerFunc, queueName str
 		nil,       // args
 	)
 	if err != nil {
-		logger.Fatalf("Failed to register consumer on queue:", queueName, err)
+		logger.Fatalf("Failed to register consumer on queue: %s, %v", queueName, err)
 	}
 
 	for {

@@ -32,38 +32,6 @@ import (
 	commonLogger "github.com/trustedanalytics/tap-go-common/logger"
 )
 
-// we need this redundant interface to be able to inject TestClient in Test class
-type KubernetesClient interface {
-	ReplicationControllers(namespace string) k8sClient.ReplicationControllerInterface
-	Nodes() k8sClient.NodeInterface
-	Events(namespace string) k8sClient.EventInterface
-	Endpoints(namespace string) k8sClient.EndpointsInterface
-	Pods(namespace string) k8sClient.PodInterface
-	PodTemplates(namespace string) k8sClient.PodTemplateInterface
-	Services(namespace string) k8sClient.ServiceInterface
-	LimitRanges(namespace string) k8sClient.LimitRangeInterface
-	ResourceQuotas(namespace string) k8sClient.ResourceQuotaInterface
-	ServiceAccounts(namespace string) k8sClient.ServiceAccountsInterface
-	Secrets(namespace string) k8sClient.SecretsInterface
-	Namespaces() k8sClient.NamespaceInterface
-	PersistentVolumes() k8sClient.PersistentVolumeInterface
-	PersistentVolumeClaims(namespace string) k8sClient.PersistentVolumeClaimInterface
-	ComponentStatuses() k8sClient.ComponentStatusInterface
-	ConfigMaps(namespace string) k8sClient.ConfigMapsInterface
-}
-
-type ExtensionsInterface interface {
-	NetworkPolicies(namespace string) k8sClient.NetworkPolicyInterface
-	Scales(namespace string) k8sClient.ScaleInterface
-	DaemonSets(namespace string) k8sClient.DaemonSetInterface
-	Deployments(namespace string) k8sClient.DeploymentInterface
-	Jobs(namespace string) k8sClient.JobInterface
-	Ingress(namespace string) k8sClient.IngressInterface
-	ThirdPartyResources() k8sClient.ThirdPartyResourceInterface
-	ReplicaSets(namespace string) k8sClient.ReplicaSetInterface
-	PodSecurityPolicies() k8sClient.PodSecurityPolicyInterface
-}
-
 type KubernetesTestCreator struct {
 	testClient          *testclient.Fake
 	testExtensionClient *testclient.FakeExperimental
@@ -82,7 +50,7 @@ type K8sClusterCredentials struct {
 	ConsulEndpoint string `json:"consul_http_api"`
 }
 
-func GetNewClient(creds K8sClusterCredentials) (KubernetesClient, error) {
+func GetNewClient(creds K8sClusterCredentials) (k8sClient.Interface, error) {
 	if creds.Server == "" {
 		// get default K8s api client from same cluster as pod's
 		return k8sClient.NewInCluster()
@@ -92,23 +60,6 @@ func GetNewClient(creds K8sClusterCredentials) (KubernetesClient, error) {
 			return nil, err
 		}
 		return k8sClient.New(config)
-	}
-}
-
-func GetNewExtensionsClient(creds K8sClusterCredentials) (ExtensionsInterface, error) {
-	if creds.Server == "" {
-		// get default K8s api client from same cluster as pod's
-		config, err := restclient.InClusterConfig()
-		if err != nil {
-			return nil, err
-		}
-		return k8sClient.NewExtensions(config)
-	} else {
-		config, err := getKubernetesConfig(creds)
-		if err != nil {
-			return nil, err
-		}
-		return k8sClient.NewExtensions(config)
 	}
 }
 
@@ -141,11 +92,11 @@ func getKubernetesConfig(creds K8sClusterCredentials) (*restclient.Config, error
 	return config, nil
 }
 
-func (k *KubernetesTestCreator) GetNewClient(creds K8sClusterCredentials) (KubernetesClient, error) {
+func (k *KubernetesTestCreator) GetNewClient(creds K8sClusterCredentials) (k8sClient.Interface, error) {
 	return k.testClient, nil
 }
 
-func (k *KubernetesTestCreator) GetNewExtensionsClient(creds K8sClusterCredentials) (ExtensionsInterface, error) {
+func (k *KubernetesTestCreator) GetNewExtensionsClient(creds K8sClusterCredentials) (k8sClient.Interface, error) {
 	return k.testExtensionClient, nil
 }
 

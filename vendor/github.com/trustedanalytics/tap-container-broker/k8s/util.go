@@ -17,29 +17,34 @@ package k8s
 
 import (
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+
+	"github.com/trustedanalytics/tap-go-common/util"
 )
 
 func ConvertToProperEnvName(key string) string {
 	return strings.Replace(key, "-", "_", -1)
 }
 
-func getCephImageSize() uint64 {
-	cephEnvValue := os.Getenv("CEPH_IMAGE_SIZE_MB")
-	if cephEnvValue != "" {
-		size, err := strconv.ParseUint(cephEnvValue, 0, 64)
+func getCephImageSize(sizeValue string) uint64 {
+	value, errDefault := util.GetUint64EnvValueOrDefault("CEPH_IMAGE_SIZE_MB", defaultCephImageSizeMB)
+	if sizeValue != "" {
+		size, err := strconv.ParseUint(sizeValue, 0, 64)
 		if err != nil {
-			logger.Errorf("Can't parse value: %s of CEPH_IMAGE_SIZE_MB env - default limit: %d will be used", cephEnvValue, defaultCephImageSizeMB)
-			return defaultCephImageSizeMB
+			logger.Errorf("Can't parse value: %s ", sizeValue)
+		}
+
+		if errDefault != nil {
+			logger.Errorf("Can't parse value CEPH_IMAGE_SIZE_MB env - default limit: %d will be used", value)
+			return value
 		}
 		return size
 	}
-	return defaultCephImageSizeMB
+	return value
 }
 
 func addProtocolToHost(annotations map[string]string, host string) string {

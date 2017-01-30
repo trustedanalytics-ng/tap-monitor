@@ -54,7 +54,7 @@ func TestAdjustTemplateIdAndImage(t *testing.T) {
 		imageKey := "image"
 
 		rawTemplate := templateModels.RawTemplate{
-			imageKey: templateModels.GetPlaceholderWithDollarPrefix(templateModels.PLACEHOLDER_IMAGE),
+			imageKey: templateModels.GetPlaceholderWithDollarPrefix(templateModels.PlaceholderImage),
 		}
 
 		Convey("For proper input should return proper response", func() {

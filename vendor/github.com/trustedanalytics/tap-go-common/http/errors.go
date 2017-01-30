@@ -30,6 +30,8 @@ const (
 	ConflictError       string = "conflict"
 	EmptyField          string = "is empty!"
 	CannotUnmarshal     string = "cannot unmarshal"
+	CanNotBeChanged     string = "can not be changed!"
+	MustMatch           string = "must match"
 )
 
 func translateHttpErrorStatus(status int) int {
@@ -43,7 +45,9 @@ func translateHttpErrorStatus(status int) int {
 func IsBadRequestError(err error) bool {
 	return isErrorTypeStringInErrorMessage(EmptyField, err) ||
 		isErrorTypeStringInErrorMessage(ConflictCompareEtcd, err) ||
-		isErrorTypeStringInErrorMessage(CannotUnmarshal, err)
+		isErrorTypeStringInErrorMessage(CannotUnmarshal, err) ||
+		isErrorTypeStringInErrorMessage(CanNotBeChanged, err) ||
+		isErrorTypeStringInErrorMessage(MustMatch, err)
 
 }
 

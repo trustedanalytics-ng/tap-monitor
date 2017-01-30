@@ -160,7 +160,7 @@ func adjustTemplateIdAndImage(templateID, image string, rawTemplate templateRepo
 	}
 
 	adjustedRawTemplate := strings.Replace(string(rawTemplateBytes),
-		templateRepositoryModels.GetPlaceholderWithDollarPrefix(templateRepositoryModels.PLACEHOLDER_IMAGE), image, -1)
+		templateRepositoryModels.GetPlaceholderWithDollarPrefix(templateRepositoryModels.PlaceholderImage), image, -1)
 
 	result := templateRepositoryModels.RawTemplate{}
 	err = json.Unmarshal([]byte(adjustedRawTemplate), &result)

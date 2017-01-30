@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2016 Intel Corporation
+ * Copyright (c) 2017 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,25 +13,3 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package models
-
-type Template struct {
-	Id         string        `json:"templateId"`
-	State      TemplateState `json:"state"`
-	AuditTrail AuditTrail    `json:"auditTrail"`
-}
-
-type TemplateState string
-
-const (
-	TemplateStateInProgress  TemplateState = "IN_PROGRESS"
-	TemplateStateReady       TemplateState = "READY"
-	TemplateStateUnavailable TemplateState = "UNAVAILABLE"
-)
-
-func (template *Template) ValidateTemplateStructCreate() error {
-	if template.Id != "" {
-		return GetIdFieldHasToBeEmptyError()
-	}
-	return nil
-}

@@ -62,6 +62,7 @@ type KubernetesComponent struct {
 	Services               []*api.Service               `json:"services"`
 	ServiceAccounts        []*api.ServiceAccount        `json:"serviceAccounts"`
 	Secrets                []*api.Secret                `json:"secrets"`
+	ConfigMaps             []*api.ConfigMap             `json:"configMaps"`
 }
 
 func IsServiceBrokerTemplate(template Template) bool {

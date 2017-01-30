@@ -8,7 +8,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/util/intstr"
 
-	"github.com/trustedanalytics/tap-go-common/util"
+	commonHttp "github.com/trustedanalytics/tap-go-common/http"
 )
 
 func MakeIngressForServices(instanceId, hostname string, services []api.Service) extensions.Ingress {
@@ -105,7 +105,7 @@ func getK8sObjectMeta(instanceId string) api.ObjectMeta {
 
 func getK8sObjectMetaWithShortIdAsName(instanceId string) api.ObjectMeta {
 	return api.ObjectMeta{
-		Name:   util.UuidToShortDnsName(instanceId),
+		Name:   commonHttp.UuidToShortDnsName(instanceId),
 		Labels: GetK8sTapLabels(instanceId),
 	}
 }
