@@ -49,27 +49,31 @@ func ExecuteFlowForUserDefinedApp(imageId string) error {
 			return err
 		}
 
-		instance := catalogModels.Instance{
-			Name:     application.Name,
-			Type:     catalogModels.InstanceTypeApplication,
-			ClassId:  application.Id,
-			Bindings: convertDependenciesToBindings(application.InstanceDependencies),
-			Metadata: []catalogModels.Metadata{
-				{Id: catalogModels.APPLICATION_IMAGE_ADDRESS, Value: getImageAddress(imageId)},
-			},
-			AuditTrail: catalogModels.AuditTrail{
-				LastUpdateBy: application.AuditTrail.LastUpdateBy,
-				CreatedBy:    application.AuditTrail.CreatedBy,
-			},
-		}
-		instance.Metadata = append(instance.Metadata, application.Metadata...)
-
+		instance := createInstanceFromApplication(application, imageId)
 		if _, _, err = config.CatalogApi.AddApplicationInstance(application.Id, instance); err != nil {
 			logger.Errorf("Failed to call AddApplicationInstance for image: %s - err: %v", imageId, err)
 			return err
 		}
 	}
 	return nil
+}
+
+func createInstanceFromApplication(application catalogModels.Application, imageId string) catalogModels.Instance {
+	instance := catalogModels.Instance{
+		Name:     application.Name,
+		Type:     catalogModels.InstanceTypeApplication,
+		ClassId:  application.Id,
+		Bindings: convertDependenciesToBindings(application.InstanceDependencies),
+		Metadata: []catalogModels.Metadata{
+			{Id: catalogModels.APPLICATION_IMAGE_ADDRESS, Value: getImageAddress(imageId)},
+		},
+		AuditTrail: catalogModels.AuditTrail{
+			LastUpdateBy: application.AuditTrail.LastUpdateBy,
+			CreatedBy:    application.AuditTrail.CreatedBy,
+		},
+	}
+	instance.Metadata = append(instance.Metadata, application.Metadata...)
+	return instance
 }
 
 func ExecuteFlowForUserDefinedOffering(imageId string) (err error) {
@@ -145,7 +149,7 @@ func ExecuteFlowForUserDefinedOffering(imageId string) (err error) {
 
 	offering, _, err = UpdateOffering(offeringID, "TemplateId", offering.TemplateId, templateID)
 	if err != nil {
-		logger.Errorf("cannot update service with id %s with new templateId equal to: %s", offeringID, templateID)
+		logger.Errorf("cannot update service with id %s with new templateID equal to: %s", offeringID, templateID)
 		return err
 	}
 	return

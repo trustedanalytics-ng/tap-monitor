@@ -25,6 +25,7 @@ import (
 	imageFactoryModels "github.com/trustedanalytics/tap-image-factory/models"
 )
 
+const testImageID = "654"
 const testInstanceID = "123"
 const testBrokerTemplateID = "789"
 const testApplicationImageAddress = "987"
@@ -41,17 +42,6 @@ func getTestInstance() catalogModels.Instance {
 			{Id: catalogModels.APPLICATION_IMAGE_ADDRESS, Value: testApplicationImageAddress},
 		},
 		State:      catalogModels.InstanceStateRequested,
-		AuditTrail: catalogModels.AuditTrail{},
-	}
-}
-
-const testImageID = "654"
-
-func getTestImage() catalogModels.Image {
-	return catalogModels.Image{
-		Id:         testImageID,
-		Type:       catalogModels.ImageTypeJava,
-		State:      catalogModels.ImageStateBuilding,
 		AuditTrail: catalogModels.AuditTrail{},
 	}
 }
@@ -88,6 +78,18 @@ func TestGetBuildImagePostRequest(t *testing.T) {
 		}
 
 		actualResponse := getBuildImagePostRequest(testImageID)
+
+		So(actualResponse, ShouldResemble, properResponse)
+	})
+}
+
+func TestGetScaleInstanceRequest(t *testing.T) {
+	Convey("getScaleInstanceRequest should return proper response", t, func() {
+		properResponse := containerBrokerModels.ScaleInstanceRequest{
+			Id: testInstanceID,
+		}
+
+		actualResponse := getScaleInstanceRequest(testInstanceID)
 
 		So(actualResponse, ShouldResemble, properResponse)
 	})

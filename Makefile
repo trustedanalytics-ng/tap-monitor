@@ -68,5 +68,12 @@ build_anywhere: prepare_dirs
 	cp ./$(APP_NAME) ./application/$(APP_NAME)
 	rm -Rf ./temp
 
+mock_update:
+	$(GOBIN)/mockgen -source=vendor/github.com/trustedanalytics/tap-container-broker/k8s/k8sfabricator.go -package=mocks -destination=mocks/k8sfabricator_mock.go
+	$(GOBIN)/mockgen -source=vendor/github.com/trustedanalytics/tap-ceph-broker/client/client.go -package=mocks -destination=mocks/ceph_mock.go
+	$(GOBIN)/mockgen -source=vendor/github.com/trustedanalytics/tap-catalog/client/client.go -package=mocks -destination=mocks/catalog_mock.go
+	$(GOBIN)/mockgen -source=vendor/github.com/trustedanalytics/tap-template-repository/client/client_api.go -package=mocks -destination=mocks/template_mock.go
+	./add_license.sh
+
 test: verify_gopath
 	go test --cover $(APP_DIR_LIST)
