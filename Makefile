@@ -51,28 +51,28 @@ deps_fetch_specific: bin/govendor
 	$(GOBIN)/govendor fetch -v $(DEP_URL)
 
 deps_update_tap: verify_gopath
-	$(GOBIN)/govendor update github.com/trustedanalytics/...
-	$(GOBIN)/govendor remove github.com/trustedanalytics/$(APP_NAME)/...
+	$(GOBIN)/govendor update github.com/trustedanalytics-ng/...
+	$(GOBIN)/govendor remove github.com/trustedanalytics-ng/$(APP_NAME)/...
 	@echo "Done"
 
 prepare_dirs:
-	mkdir -p ./temp/src/github.com/trustedanalytics/$(APP_NAME)
+	mkdir -p ./temp/src/github.com/trustedanalytics-ng/$(APP_NAME)
 	$(eval REPOFILES=$(shell pwd)/*)
-	ln -sf $(REPOFILES) temp/src/github.com/trustedanalytics/$(APP_NAME)
+	ln -sf $(REPOFILES) temp/src/github.com/trustedanalytics-ng/$(APP_NAME)
 
 build_anywhere: prepare_dirs
 	$(eval GOPATH=$(shell cd ./temp; pwd))
-	$(eval APP_DIR_LIST=$(shell GOPATH=$(GOPATH) go list ./temp/src/github.com/trustedanalytics/$(APP_NAME)/... | grep -v /vendor/))
+	$(eval APP_DIR_LIST=$(shell GOPATH=$(GOPATH) go list ./temp/src/github.com/trustedanalytics-ng/$(APP_NAME)/... | grep -v /vendor/))
 	GOPATH=$(GOPATH) CGO_ENABLED=0 go build -tags netgo $(APP_DIR_LIST)
 	rm -Rf application && mkdir application
 	cp ./$(APP_NAME) ./application/$(APP_NAME)
 	rm -Rf ./temp
 
 mock_update:
-	$(GOBIN)/mockgen -source=vendor/github.com/trustedanalytics/tap-container-broker/k8s/k8sfabricator.go -package=mocks -destination=mocks/k8sfabricator_mock.go
-	$(GOBIN)/mockgen -source=vendor/github.com/trustedanalytics/tap-ceph-broker/client/client.go -package=mocks -destination=mocks/ceph_mock.go
-	$(GOBIN)/mockgen -source=vendor/github.com/trustedanalytics/tap-catalog/client/client.go -package=mocks -destination=mocks/catalog_mock.go
-	$(GOBIN)/mockgen -source=vendor/github.com/trustedanalytics/tap-template-repository/client/client_api.go -package=mocks -destination=mocks/template_mock.go
+	$(GOBIN)/mockgen -source=vendor/github.com/trustedanalytics-ng/tap-container-broker/k8s/k8sfabricator.go -package=mocks -destination=mocks/k8sfabricator_mock.go
+	$(GOBIN)/mockgen -source=vendor/github.com/trustedanalytics-ng/tap-ceph-broker/client/client.go -package=mocks -destination=mocks/ceph_mock.go
+	$(GOBIN)/mockgen -source=vendor/github.com/trustedanalytics-ng/tap-catalog/client/client.go -package=mocks -destination=mocks/catalog_mock.go
+	$(GOBIN)/mockgen -source=vendor/github.com/trustedanalytics-ng/tap-template-repository/client/client_api.go -package=mocks -destination=mocks/template_mock.go
 	./add_license.sh
 
 test: verify_gopath

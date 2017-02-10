@@ -17,9 +17,9 @@
 package app
 
 import (
-	catalogModels "github.com/trustedanalytics/tap-catalog/models"
-	containerBrokerModels "github.com/trustedanalytics/tap-container-broker/models"
-	imageFactoryModels "github.com/trustedanalytics/tap-image-factory/models"
+	catalogModels "github.com/trustedanalytics-ng/tap-catalog/models"
+	containerBrokerModels "github.com/trustedanalytics-ng/tap-container-broker/models"
+	imageFactoryModels "github.com/trustedanalytics-ng/tap-image-factory/models"
 )
 
 func getCreateInstanceRequest(instance catalogModels.Instance) containerBrokerModels.CreateInstanceRequest {

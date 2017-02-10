@@ -20,11 +20,11 @@ import (
 	"errors"
 	"os"
 
-	catalogApi "github.com/trustedanalytics/tap-catalog/client"
-	cephBrokerApi "github.com/trustedanalytics/tap-ceph-broker/client"
-	kubernetesApi "github.com/trustedanalytics/tap-container-broker/k8s"
-	"github.com/trustedanalytics/tap-go-common/util"
-	templateRepositoryApi "github.com/trustedanalytics/tap-template-repository/client"
+	catalogApi "github.com/trustedanalytics-ng/tap-catalog/client"
+	cephBrokerApi "github.com/trustedanalytics-ng/tap-ceph-broker/client"
+	kubernetesApi "github.com/trustedanalytics-ng/tap-container-broker/k8s"
+	"github.com/trustedanalytics-ng/tap-go-common/util"
+	templateRepositoryApi "github.com/trustedanalytics-ng/tap-template-repository/client"
 )
 
 type ConnectionConfig struct {

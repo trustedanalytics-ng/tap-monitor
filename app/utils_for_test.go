@@ -21,8 +21,8 @@ import (
 
 	"github.com/golang/mock/gomock"
 
-	catalogModels "github.com/trustedanalytics/tap-catalog/models"
-	"github.com/trustedanalytics/tap-monitor/mocks"
+	catalogModels "github.com/trustedanalytics-ng/tap-catalog/models"
+	"github.com/trustedanalytics-ng/tap-monitor/mocks"
 )
 
 const (

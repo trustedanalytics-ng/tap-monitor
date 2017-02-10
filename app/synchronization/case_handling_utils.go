@@ -8,7 +8,7 @@ import (
 
 	"github.com/patrickmn/go-cache"
 
-	"github.com/trustedanalytics/tap-catalog/models"
+	"github.com/trustedanalytics-ng/tap-catalog/models"
 )
 
 type caseToFix struct {

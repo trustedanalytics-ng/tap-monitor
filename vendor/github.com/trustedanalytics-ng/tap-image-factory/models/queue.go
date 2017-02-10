@@ -14,25 +14,26 @@
  * limitations under the License.
  */
 
-package main
+package models
 
-import (
-	"sync"
+import "github.com/trustedanalytics-ng/tap-catalog/models"
 
-	commonLogger "github.com/trustedanalytics-ng/tap-go-common/logger"
-	"github.com/trustedanalytics-ng/tap-go-common/util"
-	"github.com/trustedanalytics-ng/tap-monitor/app"
+const (
+	IMAGE_FACTORY_QUEUE_NAME        = "tap-image-factory"
+	IMAGE_FACTORY_IMAGE_ROUTING_KEY = "image"
 )
 
-var logger, _ = commonLogger.InitLogger("main")
-var waitGroup = &sync.WaitGroup{}
+type ImageGetResponse struct {
+	ImageId    string `json:"id"`
+	Type       string `json:"type"`
+	State      string `json:"state"`
+	AuditTrail models.AuditTrail
+}
 
-func main() {
-	go util.TerminationObserver(waitGroup, "Monitor")
+type ImageStatePutRequest struct {
+	State string `json:"state"`
+}
 
-	if err := app.InitConnections(); err != nil {
-		logger.Fatal("ERROR initConnections: ", err.Error())
-	}
-
-	app.StartMonitor(waitGroup)
+type BuildImagePostRequest struct {
+	ImageId string `json:"id"`
 }

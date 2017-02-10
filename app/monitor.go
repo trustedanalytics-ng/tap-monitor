@@ -24,13 +24,13 @@ import (
 
 	"github.com/streadway/amqp"
 
-	catalogModels "github.com/trustedanalytics/tap-catalog/models"
-	containerBrokerModels "github.com/trustedanalytics/tap-container-broker/models"
-	commonLogger "github.com/trustedanalytics/tap-go-common/logger"
-	"github.com/trustedanalytics/tap-go-common/queue"
-	"github.com/trustedanalytics/tap-go-common/util"
-	imageFactoryModels "github.com/trustedanalytics/tap-image-factory/models"
-	"github.com/trustedanalytics/tap-monitor/app/synchronization"
+	catalogModels "github.com/trustedanalytics-ng/tap-catalog/models"
+	containerBrokerModels "github.com/trustedanalytics-ng/tap-container-broker/models"
+	commonLogger "github.com/trustedanalytics-ng/tap-go-common/logger"
+	"github.com/trustedanalytics-ng/tap-go-common/queue"
+	"github.com/trustedanalytics-ng/tap-go-common/util"
+	imageFactoryModels "github.com/trustedanalytics-ng/tap-image-factory/models"
+	"github.com/trustedanalytics-ng/tap-monitor/app/synchronization"
 )
 
 var logger, _ = commonLogger.InitLogger("app")

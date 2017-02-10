@@ -23,9 +23,9 @@ import (
 	"github.com/golang/mock/gomock"
 	. "github.com/smartystreets/goconvey/convey"
 
-	"github.com/trustedanalytics/tap-catalog/builder"
-	catalogModels "github.com/trustedanalytics/tap-catalog/models"
-	templateModels "github.com/trustedanalytics/tap-template-repository/model"
+	"github.com/trustedanalytics-ng/tap-catalog/builder"
+	catalogModels "github.com/trustedanalytics-ng/tap-catalog/models"
+	templateModels "github.com/trustedanalytics-ng/tap-template-repository/model"
 )
 
 func TestExecuteFlowForUserDefinedApp(t *testing.T) {

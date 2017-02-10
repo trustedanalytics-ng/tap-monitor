@@ -13,26 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package main
+package client
 
 import (
-	"sync"
+	"errors"
+	"fmt"
+	"net/http"
 
-	commonLogger "github.com/trustedanalytics-ng/tap-go-common/logger"
-	"github.com/trustedanalytics-ng/tap-go-common/util"
-	"github.com/trustedanalytics-ng/tap-monitor/app"
+	"strconv"
+
+	brokerHttp "github.com/trustedanalytics-ng/tap-go-common/http"
 )
 
-var logger, _ = commonLogger.InitLogger("main")
-var waitGroup = &sync.WaitGroup{}
-
-func main() {
-	go util.TerminationObserver(waitGroup, "Monitor")
-
-	if err := app.InitConnections(); err != nil {
-		logger.Fatal("ERROR initConnections: ", err.Error())
+func (c *TapCatalogApiConnector) GetCatalogHealth() (int, error) {
+	connector := c.getApiConnector(fmt.Sprintf("%s/%s", c.Address, healthz))
+	status, _, err := brokerHttp.RestGET(connector.Url, brokerHttp.GetBasicAuthHeader(connector.BasicAuth), connector.Client)
+	if status != http.StatusOK {
+		err = errors.New("Invalid health status: " + strconv.Itoa(status))
 	}
-
-	app.StartMonitor(waitGroup)
+	return status, err
 }

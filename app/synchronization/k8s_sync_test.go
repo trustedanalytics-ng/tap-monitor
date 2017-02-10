@@ -23,8 +23,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	. "github.com/smartystreets/goconvey/convey"
 
-	templateModels "github.com/trustedanalytics/tap-template-repository/model"
-	kubernetesApi "github.com/trustedanalytics/tap-container-broker/k8s"
+	templateModels "github.com/trustedanalytics-ng/tap-template-repository/model"
+	kubernetesApi "github.com/trustedanalytics-ng/tap-container-broker/k8s"
 )
 
 const (

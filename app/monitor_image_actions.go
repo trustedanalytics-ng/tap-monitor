@@ -21,9 +21,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/trustedanalytics/tap-catalog/builder"
-	catalogModels "github.com/trustedanalytics/tap-catalog/models"
-	templateRepositoryModels "github.com/trustedanalytics/tap-template-repository/model"
+	"github.com/trustedanalytics-ng/tap-catalog/builder"
+	catalogModels "github.com/trustedanalytics-ng/tap-catalog/models"
+	templateRepositoryModels "github.com/trustedanalytics-ng/tap-template-repository/model"
 )
 
 func convertDependenciesToBindings(dependencies []catalogModels.InstanceDependency) []catalogModels.InstanceBindings {

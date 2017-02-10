@@ -13,11 +13,11 @@ import (
 
 	"github.com/patrickmn/go-cache"
 
-	"github.com/trustedanalytics/tap-catalog/builder"
-	catalogApi "github.com/trustedanalytics/tap-catalog/client"
-	"github.com/trustedanalytics/tap-catalog/models"
-	kubernetesApi "github.com/trustedanalytics/tap-container-broker/k8s"
-	trModels "github.com/trustedanalytics/tap-template-repository/model"
+	"github.com/trustedanalytics-ng/tap-catalog/builder"
+	catalogApi "github.com/trustedanalytics-ng/tap-catalog/client"
+	"github.com/trustedanalytics-ng/tap-catalog/models"
+	kubernetesApi "github.com/trustedanalytics-ng/tap-container-broker/k8s"
+	trModels "github.com/trustedanalytics-ng/tap-template-repository/model"
 )
 
 const (

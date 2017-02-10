@@ -22,8 +22,8 @@ import (
 
 	. "github.com/smartystreets/goconvey/convey"
 
-	catalogModels "github.com/trustedanalytics/tap-catalog/models"
-	templateModels "github.com/trustedanalytics/tap-template-repository/model"
+	catalogModels "github.com/trustedanalytics-ng/tap-catalog/models"
+	templateModels "github.com/trustedanalytics-ng/tap-template-repository/model"
 )
 
 func TestConvertDependenciesToBindings(t *testing.T) {

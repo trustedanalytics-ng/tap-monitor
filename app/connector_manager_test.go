@@ -25,10 +25,10 @@ import (
 	"github.com/golang/mock/gomock"
 	. "github.com/smartystreets/goconvey/convey"
 
-	catalogApi "github.com/trustedanalytics/tap-catalog/client"
-	cephApi "github.com/trustedanalytics/tap-ceph-broker/client"
-	kubernetesApi "github.com/trustedanalytics/tap-container-broker/k8s"
-	templateRepositoryApi "github.com/trustedanalytics/tap-template-repository/client"
+	catalogApi "github.com/trustedanalytics-ng/tap-catalog/client"
+	cephApi "github.com/trustedanalytics-ng/tap-ceph-broker/client"
+	kubernetesApi "github.com/trustedanalytics-ng/tap-container-broker/k8s"
+	templateRepositoryApi "github.com/trustedanalytics-ng/tap-template-repository/client"
 )
 
 const (
